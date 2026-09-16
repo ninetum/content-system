@@ -36,7 +36,7 @@ window.CMS_SEED = (function () {
       id: 'ct-1', title: 'พากันไปดอยอินทนนท์ หมอกลงเต็มถนน', pillar: 'รีวิว / ประสบการณ์', style_id: 'st-1',
       body: 'ออกจากเชียงใหม่ตีห้า อากาศ 14 องศา หมอกลงจนมองเห็นไฟท้ายคันหน้าแค่ราง ๆ\n\nช่วงกม.ที่ 31 ขึ้นมาถึงจุดชมวิว พระอาทิตย์เพิ่งโผล่พอดี — ภาพนี้คือของจริง ไม่ได้แต่งสีเลยครับ\n\nใครจะขึ้นช่วงนี้ เตรียมเสื้อกันลมกับถุงมือกันหนาวไปด้วย แล้วออกเช้าหน่อยจะได้มุมสวยแบบนี้',
       hashtags: ['ทริปมอเตอร์ไซค์', 'ดอยอินทนนท์', 'เที่ยวเชียงใหม่'],
-      channel_ids: ['ch-fb', 'ch-tt'], media_ids: ['md-1'], product_ids: ['pd-1', 'pd-2'],
+      channel_ids: ['ch-fb', 'ch-tt'], media_ids: ['md-1'], product_ids: ['pd-1', 'pd-3'],
       status: 'published', scheduled_at: at(-4, 7, 30), published_at: at(-4, 7, 32), author: 'ทีมคอนเทนต์', note: '',
     },
     {
@@ -57,14 +57,14 @@ window.CMS_SEED = (function () {
       id: 'ct-4', title: 'ตกหมึกคืนเดือนมืด ต้องเตรียมอะไร', pillar: 'ให้ความรู้ / How-to', style_id: 'st-1',
       body: 'คืนเดือนมืดคือช่วงที่หมึกขึ้นดีที่สุด แต่ต้องเตรียมของให้พร้อม\n\n1. ไฟล่อหมึกสีเขียว กำลังไฟพอประมาณ อย่าแรงเกิน\n2. โยะ 2-3 สี สลับจนเจอสีที่หมึกกิน\n3. ถังน้ำแข็งแยกจากถังเก็บหมึก\n\nเทคนิคเล็ก ๆ คือรอให้ไฟนิ่งอย่างน้อย 20 นาทีก่อนเริ่มตี',
       hashtags: ['ตกหมึก', 'ตกปลา', 'ทะเลไทย'],
-      channel_ids: ['ch-tt', 'ch-yt'], media_ids: ['md-4'], product_ids: ['pd-3'],
+      channel_ids: ['ch-tt', 'ch-yt'], media_ids: ['md-4'], product_ids: ['pd-2'],
       status: 'draft', scheduled_at: null, published_at: null, author: 'ทีมคอนเทนต์', note: '',
     },
     {
       id: 'ct-5', title: 'สรุป 5 เครื่องมือช่วยตัดคลิปให้เร็วขึ้น 3 เท่า', pillar: 'ให้ความรู้ / How-to', style_id: 'st-4',
       body: 'ทีมเราลดเวลาตัดคลิปจาก 3 ชั่วโมงเหลือ 55 นาที ด้วย 5 ตัวนี้\n\n- ตัดช่วงเงียบอัตโนมัติ\n- ถอดเสียงเป็นซับไทยอัตโนมัติ\n- เทมเพลต transition ที่ใช้ซ้ำได้\n- ไลบรารีเสียงประกอบจัดหมวดไว้ล่วงหน้า\n- เรนเดอร์เป็นคิว ไม่ต้องนั่งเฝ้า\n\nข้อควรระวัง: ซับอัตโนมัติยังพิมพ์ชื่อเฉพาะผิดอยู่ ต้องกวาดตาตรวจก่อนปล่อยเสมอ',
       hashtags: ['ตัดต่อวิดีโอ', 'ทำคอนเทนต์', 'สายไอที'],
-      channel_ids: ['ch-fb', 'ch-yt', 'ch-tt'], media_ids: [],
+      channel_ids: ['ch-fb', 'ch-yt', 'ch-tt'], media_ids: [], product_ids: ['pd-4'],
       status: 'published', scheduled_at: at(-9, 20, 0), published_at: at(-9, 20, 3), author: 'ทีมคอนเทนต์', note: '',
     },
     {
@@ -91,22 +91,38 @@ window.CMS_SEED = (function () {
   ];
 
   const products = [
-    { id: 'pd-1', name: 'กล่องท้ายรถ 45 ลิตร พร้อมติดตั้ง', sku: 'TB-45', price: 3290, cost: 1850,
-      url: 'https://example.com/products/topbox-45', image_url: '', active: true, note: 'ขายดีสุด' },
-    { id: 'pd-2', name: 'ชุดแต่งกันลม รุ่นมาตรฐาน', sku: 'WS-01', price: 1590, cost: 820,
-      url: 'https://example.com/products/windshield', image_url: '', active: true, note: '' },
-    { id: 'pd-3', name: 'ไฟล่อหมึกสีเขียว 30W', sku: 'SQ-30', price: 890, cost: 410,
-      url: 'https://example.com/products/squid-light', image_url: '', active: true, note: 'ขายดีช่วงเดือนมืด' },
+    { id: 'pd-1', product_type: 'affiliate', merchant: 'shopee', name: 'กระเป๋ากันน้ำติดมอเตอร์ไซค์ 20L',
+      sku: 'AF-BAG20', price: 590, cost: 0, commission_rate: 8, commission_fixed: 0,
+      url: 'https://s.shopee.co.th/example-bag', image_url: '', active: true, in_bio: true, sort_order: 1,
+      note: 'คลิปรีวิวตัวนี้ยอดดีสุด' },
+    { id: 'pd-2', product_type: 'affiliate', merchant: 'shopee', name: 'ไฟล่อหมึก LED สีเขียว 30W',
+      sku: 'AF-SQ30', price: 890, cost: 0, commission_rate: 6, commission_fixed: 0,
+      url: 'https://s.shopee.co.th/example-squid', image_url: '', active: true, in_bio: true, sort_order: 2,
+      note: 'ขายดีช่วงเดือนมืด' },
+    { id: 'pd-3', product_type: 'affiliate', merchant: 'lazada', name: 'ขาตั้งมือถือติดแฮนด์ กันสั่น',
+      sku: 'AF-MOUNT', price: 350, cost: 0, commission_rate: 10, commission_fixed: 0,
+      url: 'https://www.lazada.co.th/example-mount', image_url: '', active: true, in_bio: true, sort_order: 3,
+      note: '' },
+    { id: 'pd-4', product_type: 'own', merchant: 'other', name: 'ทัวร์เชียงใหม่-ปาย 3 วัน 2 คืน',
+      sku: 'TOUR-CNX3', price: 4900, cost: 3100, commission_rate: 0, commission_fixed: 0,
+      url: 'https://example.com/tour/cnx-pai', image_url: '', active: true, in_bio: true, sort_order: 4,
+      event_date: at(21, 7, 0), capacity: 16, note: 'รอบเดือนหน้า เหลือ 6 ที่' },
   ];
 
-  // ยอดขายที่เกิดจากคอนเทนต์ — ตัวเลขนี้คือสิ่งที่ทำให้รู้ว่าโพสต์ไหนคุ้ม
+  // ออร์เดอร์: คอม affiliate มีสถานะกำกับเสมอ เพราะถูกยกเลิกได้ถ้าลูกค้าคืนของ
   const sales = [
-    { id: 'sl-1', content_id: 'ct-1', channel_id: 'ch-tt', product_id: 'pd-1', qty: 6,
-      amount: 19740, cost_amount: 11100, ad_spend: 1500, source: 'กรอกเอง', note: '', sold_at: at(-3) },
-    { id: 'sl-2', content_id: 'ct-1', channel_id: 'ch-fb', product_id: 'pd-2', qty: 3,
-      amount: 4770,  cost_amount: 2460,  ad_spend: 0,    source: 'กรอกเอง', note: '', sold_at: at(-2) },
-    { id: 'sl-3', content_id: 'ct-5', channel_id: 'ch-fb', product_id: 'pd-1', qty: 1,
-      amount: 3290,  cost_amount: 1850,  ad_spend: 800,  source: 'กรอกเอง', note: '', sold_at: at(-7) },
+    { id: 'sl-1', content_id: 'ct-1', channel_id: 'ch-tt', product_id: 'pd-1', qty: 14,
+      amount: 8260, cost_amount: 0, commission: 661, ad_spend: 0,
+      status: 'จ่ายแล้ว', order_ref: '2409001', source: 'กรอกเอง', note: '', sold_at: at(-12) },
+    { id: 'sl-2', content_id: 'ct-1', channel_id: 'ch-fb', product_id: 'pd-3', qty: 9,
+      amount: 3150, cost_amount: 0, commission: 315, ad_spend: 300,
+      status: 'ยืนยันแล้ว', order_ref: '2409014', source: 'กรอกเอง', note: '', sold_at: at(-6) },
+    { id: 'sl-3', content_id: 'ct-4', channel_id: 'ch-tt', product_id: 'pd-2', qty: 6,
+      amount: 5340, cost_amount: 0, commission: 320, ad_spend: 0,
+      status: 'รอยืนยัน', order_ref: '2409031', source: 'กรอกเอง', note: 'รอพ้นระยะคืนของ', sold_at: at(-2) },
+    { id: 'sl-4', content_id: 'ct-5', channel_id: 'ch-fb', product_id: 'pd-4', qty: 2,
+      amount: 9800, cost_amount: 6200, commission: 0, ad_spend: 500,
+      status: 'จ่ายแล้ว', order_ref: 'TOUR-0091', source: 'กรอกเอง', note: 'จองทัวร์ 2 ที่', sold_at: at(-4) },
   ];
 
   return { channels, styles, media, contents, stats, activity, products, sales, clicks: [] };

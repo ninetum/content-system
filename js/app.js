@@ -254,17 +254,41 @@ function cmsApp() {
 
     /* ---------- สินค้า ---------- */
     newProduct() {
-      this.productForm = { id: null, name: '', sku: '', price: 0, cost: 0, url: '', image_url: '', active: true, note: '' };
+      this.productForm = {
+        id: null, product_type: 'affiliate', merchant: 'shopee',
+        name: '', sku: '', price: 0, cost: 0,
+        commission_rate: 0, commission_fixed: 0,
+        url: '', image_url: '', active: true, in_bio: true, sort_order: 0,
+        event_date: '', capacity: 0, note: '',
+      };
     },
-    editProduct(p) { this.productForm = { ...p }; },
+    editProduct(p) {
+      this.productForm = {
+        ...p,
+        product_type: p.product_type || 'affiliate',
+        merchant: p.merchant || 'shopee',
+        commission_rate: p.commission_rate || 0,
+        commission_fixed: p.commission_fixed || 0,
+        in_bio: p.in_bio !== false,
+        event_date: this.toLocalInput(p.event_date),
+        capacity: p.capacity || 0,
+      };
+    },
     async saveProduct() {
       const f = this.productForm;
       if (!f.name.trim()) { this.toast('ใส่ชื่อสินค้าก่อนครับ', 'warn'); return; }
       await this.run(async () => {
         const payload = {
-          name: f.name.trim(), sku: f.sku.trim(), price: Number(f.price) || 0,
-          cost: Number(f.cost) || 0, url: f.url.trim(), image_url: f.image_url.trim(),
-          active: !!f.active, note: f.note || '',
+          product_type: f.product_type, merchant: f.merchant,
+          name: f.name.trim(), sku: f.sku.trim(),
+          price: Number(f.price) || 0, cost: Number(f.cost) || 0,
+          commission_rate: Number(f.commission_rate) || 0,
+          commission_fixed: Number(f.commission_fixed) || 0,
+          url: f.url.trim(), image_url: (f.image_url || '').trim(),
+          active: !!f.active, in_bio: !!f.in_bio, sort_order: Number(f.sort_order) || 0,
+          event_date: f.product_type === 'own' ? this.fromLocalInput(f.event_date) : null,
+          capacity: Number(f.capacity) || 0,
+          note: f.note || '',
         };
         if (f.id) await Store.update('products', f.id, payload);
         else await Store.create('products', payload);
@@ -280,33 +304,73 @@ function cmsApp() {
       }, 'ลบสินค้าแล้ว');
     },
 
-    // กำไรต่อชิ้น ใช้เตือนเวลาตั้งราคาพลาด
-    margin(p) {
+    // เราได้เงินเท่าไหร่ต่อ 1 ออเดอร์ — คิดคนละแบบตามโมเดลสินค้า
+    earnPerUnit(p) {
       const price = Number(p.price) || 0;
-      const cost = Number(p.cost) || 0;
-      return { baht: price - cost, pct: price ? (((price - cost) / price) * 100).toFixed(0) : '0' };
+      if ((p.product_type || 'affiliate') === 'own') {
+        const cost = Number(p.cost) || 0;
+        return { baht: price - cost, pct: price ? (((price - cost) / price) * 100).toFixed(0) : '0', label: 'กำไร' };
+      }
+      const fixed = Number(p.commission_fixed) || 0;
+      const rate = Number(p.commission_rate) || 0;
+      const baht = fixed > 0 ? fixed : (price * rate) / 100;
+      return { baht, pct: rate ? rate.toFixed(1) : (price ? ((baht / price) * 100).toFixed(1) : '0'), label: 'คอม' };
+    },
+
+    productTypeInfo(id) {
+      return CFG.productTypes.find((t) => t.id === id) || CFG.productTypes[0];
+    },
+    merchantInfo(id) {
+      return CFG.merchants.find((m) => m.id === id) || { id, name: id, icon: '🔗' };
+    },
+    saleStatusInfo(id) {
+      return CFG.saleStatuses.find((s) => s.id === id) || CFG.saleStatuses[0];
+    },
+
+    // เงินที่เราได้จริงจากรายการขายนี้ (affiliate = คอม, ขายเอง = ราคาลบต้นทุน)
+    netOf(sale) {
+      const comm = Number(sale.commission) || 0;
+      if (comm > 0) return comm;
+      return (Number(sale.amount) || 0) - (Number(sale.cost_amount) || 0);
+    },
+    // นับเป็นรายได้จริงเฉพาะที่แพลตฟอร์มยืนยันแล้ว — ของที่ยัง "รอยืนยัน" ยังถูกยกเลิกได้
+    countsAsRevenue(sale) {
+      return !!this.saleStatusInfo(sale.status || 'รอยืนยัน').counts;
     },
 
     /* ---------- ยอดขาย ---------- */
     newSale(content = null) {
       const first = content?.product_ids?.[0] || this.db.products[0]?.id || '';
-      const p = this.productById(first);
       this.saleForm = {
         content_id: content?.id || this.db.contents[0]?.id || '',
         channel_id: content?.channel_ids?.[0] || this.db.channels[0]?.id || '',
         product_id: first, qty: 1,
-        amount: p ? Number(p.price) || 0 : 0,
-        cost_amount: p ? Number(p.cost) || 0 : 0,
-        ad_spend: 0, note: '',
+        amount: 0, cost_amount: 0, commission: 0,
+        ad_spend: 0, status: 'รอยืนยัน', order_ref: '', note: '',
       };
+      this.fillSaleAmounts();
     },
-    // เลือกสินค้า/จำนวนแล้วเติมยอดให้อัตโนมัติ จะได้ไม่ต้องคิดเลขเอง
+
+    // เลือกสินค้า/จำนวนแล้วคำนวณยอดกับคอมให้เอง จะได้ไม่ต้องกดเครื่องคิดเลข
     fillSaleAmounts() {
-      const p = this.productById(this.saleForm?.product_id);
+      const f = this.saleForm;
+      const p = this.productById(f?.product_id);
       if (!p) return;
-      const qty = Number(this.saleForm.qty) || 1;
-      this.saleForm.amount = (Number(p.price) || 0) * qty;
-      this.saleForm.cost_amount = (Number(p.cost) || 0) * qty;
+      const qty = Number(f.qty) || 1;
+      f.amount = (Number(p.price) || 0) * qty;
+
+      if ((p.product_type || 'affiliate') === 'own') {
+        f.cost_amount = (Number(p.cost) || 0) * qty;
+        f.commission = 0;
+      } else {
+        f.cost_amount = 0;
+        f.commission = this.earnPerUnit(p).baht * qty;
+      }
+    },
+
+    get saleFormProduct() { return this.productById(this.saleForm?.product_id); },
+    get saleFormIsAffiliate() {
+      return (this.saleFormProduct?.product_type || 'affiliate') !== 'own';
     },
     async saveSale() {
       const f = this.saleForm;
@@ -316,13 +380,24 @@ function cmsApp() {
         await Store.create('sales', {
           content_id: f.content_id, channel_id: f.channel_id || null, product_id: f.product_id || null,
           qty: Number(f.qty) || 1, amount: Number(f.amount) || 0,
-          cost_amount: Number(f.cost_amount) || 0, ad_spend: Number(f.ad_spend) || 0,
+          cost_amount: Number(f.cost_amount) || 0,
+          commission: Number(f.commission) || 0,
+          ad_spend: Number(f.ad_spend) || 0,
+          status: f.status || 'รอยืนยัน', order_ref: f.order_ref || '',
           source: 'กรอกเอง', note: f.note || '', sold_at: new Date().toISOString(),
         });
         this.refresh();
         this.saleForm = null;
       }, 'บันทึกยอดขายแล้ว');
     },
+    // เปลี่ยนสถานะคอมตอนแพลตฟอร์มยืนยัน/ยกเลิก
+    async setSaleStatus(sale, status) {
+      await this.run(async () => {
+        await Store.update('sales', sale.id, { status });
+        this.refresh();
+      }, `อัปเดตเป็น "${status}" แล้ว`);
+    },
+
     async deleteSale(s) {
       if (!confirm('ลบรายการขายนี้ไหมครับ?')) return;
       await this.run(async () => {
@@ -336,31 +411,90 @@ function cmsApp() {
     clicksOf(linkId) { return this.db.clicks.filter((c) => c.link_id === linkId).length; },
     fullLink(code) { return Store.linkUrl(code); },
 
-    // สร้างลิงก์แยกรายช่อง จะได้รู้ว่าคลิกมาจากช่องไหน
+    // สร้างลิงก์แยก "รายสินค้า x รายช่อง" — คลิปเดียวใส่หลายสินค้าได้ แล้วรู้ว่าตัวไหนคนกด
     async makeLinks(content) {
-      const product = this.productById((content.product_ids || [])[0]);
-      const target = (this.linkTarget || '').trim() || product?.url || '';
-      if (!target) {
-        this.toast('ยังไม่มีปลายทาง — ใส่ลิงก์สินค้าในหน้า "สินค้า & รายได้" หรือพิมพ์ลิงก์ในช่องด้านล่างก่อนครับ', 'warn');
-        return;
-      }
       const channels = content.channel_ids || [];
       if (!channels.length) { this.toast('เลือกช่องปลายทางของคอนเทนต์ก่อนครับ', 'warn'); return; }
 
+      const products = (content.product_ids || []).map((id) => this.productById(id)).filter(Boolean);
+      const manual = (this.linkTarget || '').trim();
+
+      if (!products.length && !manual) {
+        this.toast('ติ๊กสินค้าที่โพสต์นี้ขาย หรือพิมพ์ลิงก์ปลายทางในช่องด้านล่างก่อนครับ', 'warn');
+        return;
+      }
+
+      // ไม่มีสินค้าผูกไว้ = สร้างลิงก์เดียวต่อช่อง ใช้ปลายทางที่พิมพ์เอง
+      const targets = products.length
+        ? products.map((p) => ({ product: p, url: p.url }))
+        : [{ product: null, url: manual }];
+
+      const missing = targets.filter((t) => !t.url).map((t) => t.product.name);
+      if (missing.length) {
+        this.toast(`สินค้าเหล่านี้ยังไม่มีลิงก์: ${missing.join(', ')} — ไปใส่ที่หน้าสินค้าก่อนครับ`, 'warn');
+        return;
+      }
+
+      let made = 0;
       await this.run(async () => {
-        for (const chId of channels) {
-          const exists = this.db.links.some((l) => l.content_id === content.id && l.channel_id === chId);
-          if (exists) continue;
-          await Store.createLink({
-            content_id: content.id, channel_id: chId,
-            product_id: product?.id || null, target_url: target,
-            label: this.channelById(chId)?.name || '',
-          });
+        for (const t of targets) {
+          for (const chId of channels) {
+            const exists = this.db.links.some((l) =>
+              l.content_id === content.id && l.channel_id === chId &&
+              (l.product_id || null) === (t.product?.id || null));
+            if (exists) continue;
+
+            await Store.createLink({
+              content_id: content.id, channel_id: chId,
+              product_id: t.product?.id || null,
+              target_url: manual || t.url,
+              label: [t.product?.name, this.channelById(chId)?.name].filter(Boolean).join(' · '),
+            });
+            made++;
+          }
         }
         this.refresh();
         this.linkTarget = '';
-      }, 'สร้างลิงก์ติดตามผลแล้ว — คัดลอกไปแปะในโพสต์ได้เลย');
+      }, made ? `สร้างลิงก์ใหม่ ${made} อัน — คัดลอกไปแปะในโพสต์ได้เลย` : 'มีลิงก์ครบทุกสินค้าและทุกช่องแล้ว');
     },
+
+    /* ---------- หน้า Link-in-bio ---------- */
+    bioLink(product) {
+      return this.db.links.find((l) => l.product_id === product.id && l.public_bio);
+    },
+
+    get bioProducts() {
+      return this.db.products
+        .filter((p) => p.active && p.in_bio !== false)
+        .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+    },
+
+    get bioUrl() {
+      return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}bio.html`;
+    },
+
+    // สร้างลิงก์สาธารณะให้สินค้าทุกตัวที่ติ๊กโชว์ในหน้า bio
+    async buildBioLinks() {
+      const targets = this.bioProducts.filter((p) => p.url && !this.bioLink(p));
+      const noUrl = this.bioProducts.filter((p) => !p.url);
+
+      if (!targets.length && !noUrl.length) { this.toast('หน้า bio พร้อมใช้งานแล้วครับ', 'ok'); return; }
+
+      await this.run(async () => {
+        for (const p of targets) {
+          await Store.createLink({
+            product_id: p.id, target_url: p.url,
+            label: p.name, public_bio: true,
+          });
+        }
+        this.refresh();
+      }, `เตรียมลิงก์หน้า bio แล้ว ${targets.length} รายการ`);
+
+      if (noUrl.length) {
+        this.toast(`ยังไม่มีลิงก์: ${noUrl.map((p) => p.name).join(', ')}`, 'warn');
+      }
+    },
+
     async deleteLink(l) {
       if (!confirm('ลบลิงก์นี้ไหมครับ? สถิติคลิกจะหายไปด้วย')) return;
       await this.run(async () => {
@@ -369,35 +503,55 @@ function cmsApp() {
       }, 'ลบลิงก์แล้ว');
     },
 
-    /* ---------- ตัวเลขเรื่องเงิน ---------- */
+    /* ---------- ตัวเลขเรื่องเงิน ----------
+     * แยก "ยืนยันแล้ว" กับ "รอยืนยัน" เสมอ เพราะคอม affiliate ถูกยกเลิกได้
+     * ถ้านับรวมกัน จะดีใจกับเงินที่ยังไม่ได้จริง
+     */
     money(contentId) {
       const rows = this.db.sales.filter((s) => s.content_id === contentId);
-      const revenue = rows.reduce((a, b) => a + (Number(b.amount) || 0), 0);
-      const cost = rows.reduce((a, b) => a + (Number(b.cost_amount) || 0), 0);
+      const confirmed = rows.filter((s) => this.countsAsRevenue(s));
+      const pending = rows.filter((s) => (s.status || 'รอยืนยัน') === 'รอยืนยัน');
+
+      const revenue = confirmed.reduce((a, b) => a + this.netOf(b), 0);
+      const pendingRevenue = pending.reduce((a, b) => a + this.netOf(b), 0);
+      const gmv = confirmed.reduce((a, b) => a + (Number(b.amount) || 0), 0);
       const ads = rows.reduce((a, b) => a + (Number(b.ad_spend) || 0), 0);
-      const orders = rows.length;
+
       const clicks = this.linksOf(contentId).reduce((a, l) => a + this.clicksOf(l.id), 0);
       const views = this.db.stats.filter((s) => s.content_id === contentId)
         .reduce((a, b) => a + (Number(b.views) || 0), 0);
+
       return {
-        revenue, cost, ads, orders, clicks, views,
-        profit: revenue - cost - ads,
-        // รายได้ต่อ 1,000 วิว — ตัวเลขที่บอกว่าคอนเทนต์ "คุ้ม" จริงไหม
+        revenue, pendingRevenue, gmv, ads, clicks, views,
+        orders: confirmed.length,
+        profit: revenue - ads,
+        // รายได้ต่อ 1,000 วิว — บอกว่าคอนเทนต์คุ้มจริงไหม
         rpm: views ? (revenue / views) * 1000 : 0,
-        cvr: clicks ? ((orders / clicks) * 100).toFixed(1) : '0.0',
+        // EPC (รายได้ต่อคลิก) — ตัวชี้ขาดของสาย affiliate
+        epc: clicks ? revenue / clicks : 0,
+        cvr: clicks ? ((confirmed.length / clicks) * 100).toFixed(1) : '0.0',
       };
     },
 
     get moneyTotals() {
-      const revenue = this.db.sales.reduce((a, b) => a + (Number(b.amount) || 0), 0);
-      const cost = this.db.sales.reduce((a, b) => a + (Number(b.cost_amount) || 0), 0);
-      const ads = this.db.sales.reduce((a, b) => a + (Number(b.ad_spend) || 0), 0);
+      const rows = this.db.sales;
+      const confirmed = rows.filter((s) => this.countsAsRevenue(s));
+      const pending = rows.filter((s) => (s.status || 'รอยืนยัน') === 'รอยืนยัน');
+
+      const revenue = confirmed.reduce((a, b) => a + this.netOf(b), 0);
+      const pendingRevenue = pending.reduce((a, b) => a + this.netOf(b), 0);
+      const ads = rows.reduce((a, b) => a + (Number(b.ad_spend) || 0), 0);
+      const clicks = this.db.clicks.length;
       const views = this.db.stats.reduce((a, b) => a + (Number(b.views) || 0), 0);
+
       return {
-        revenue, profit: revenue - cost - ads, ads,
-        orders: this.db.sales.length,
-        clicks: this.db.clicks.length,
+        revenue, pendingRevenue, ads, clicks,
+        gmv: confirmed.reduce((a, b) => a + (Number(b.amount) || 0), 0),
+        orders: confirmed.length,
+        pendingOrders: pending.length,
+        profit: revenue - ads,
         rpm: views ? (revenue / views) * 1000 : 0,
+        epc: clicks ? revenue / clicks : 0,
         roas: ads ? (revenue / ads).toFixed(1) : '—',
       };
     },
@@ -406,13 +560,12 @@ function cmsApp() {
     get revenueRanking() {
       const rows = this.db.contents
         .map((c) => ({ content: c, ...this.money(c.id) }))
-        .filter((r) => r.revenue > 0 || r.clicks > 0)
+        .filter((r) => r.revenue > 0 || r.clicks > 0 || r.pendingRevenue > 0)
         .sort((a, b) => b.revenue - a.revenue);
       const max = Math.max(1, ...rows.map((r) => r.revenue));
       return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
     },
 
-    // ประเภทคอนเทนต์ไหนทำเงินที่สุด
     get revenueByPillar() {
       const map = {};
       for (const r of this.revenueRanking) {
@@ -425,19 +578,31 @@ function cmsApp() {
       return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
     },
 
+    // สินค้าไหนทำเงินที่สุด พร้อม EPC รายตัว (สายนายหน้าใช้ตัวนี้เลือกว่าจะดันตัวไหน)
     get productRanking() {
       const map = {};
       for (const s of this.db.sales) {
         if (!s.product_id) continue;
-        const m = map[s.product_id] || { qty: 0, revenue: 0 };
-        m.qty += Number(s.qty) || 0;
-        m.revenue += Number(s.amount) || 0;
+        const m = map[s.product_id] || { qty: 0, revenue: 0, pending: 0, orders: 0 };
+        if (this.countsAsRevenue(s)) {
+          m.qty += Number(s.qty) || 0;
+          m.revenue += this.netOf(s);
+          m.orders += 1;
+        } else if ((s.status || 'รอยืนยัน') === 'รอยืนยัน') {
+          m.pending += this.netOf(s);
+        }
         map[s.product_id] = m;
       }
+
       const rows = Object.entries(map)
-        .map(([id, v]) => ({ product: this.productById(id), ...v }))
+        .map(([id, v]) => {
+          const clicks = this.db.links.filter((l) => l.product_id === id)
+            .reduce((a, l) => a + this.clicksOf(l.id), 0);
+          return { product: this.productById(id), clicks, epc: clicks ? v.revenue / clicks : 0, ...v };
+        })
         .filter((r) => r.product)
         .sort((a, b) => b.revenue - a.revenue);
+
       const max = Math.max(1, ...rows.map((r) => r.revenue));
       return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
     },

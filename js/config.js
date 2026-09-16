@@ -35,6 +35,35 @@ window.CMS_CONFIG = {
     { id: 'rejected',  name: 'ตีกลับ',      icon: '⛔', cls: 'badge-rejected' },
   ],
 
+  // หน้ารวมลิงก์ (bio.html) — แก้ข้อความตรงนี้ให้เป็นของร้านคุณได้เลย
+  bio: {
+    title: 'ของดีที่คัดมาแล้ว',
+    subtitle: 'รีวิวจริง ใช้เอง เลือกมาให้เฉพาะตัวที่คุ้ม',
+    emoji: '🛍️',
+    footer: 'กดสั่งผ่านลิงก์ในหน้านี้ ผมได้ค่าคอมจากร้านค้า คุณจ่ายเท่าเดิมครับ',
+  },
+
+  // โมเดลรายได้ที่ระบบรองรับ
+  productTypes: [
+    { id: 'affiliate', name: 'affiliate (ได้คอม)', icon: '🤝', hint: 'ของคนอื่น เราได้ค่าคอมเป็น % หรือจำนวนคงที่ต่อออเดอร์' },
+    { id: 'own',       name: 'ขายเอง (ทัวร์/สินค้า)', icon: '🎫', hint: 'ของเราเอง คิดกำไรจากราคาขายลบต้นทุน' },
+  ],
+
+  merchants: [
+    { id: 'shopee',     name: 'Shopee',      icon: '🛍️' },
+    { id: 'lazada',     name: 'Lazada',      icon: '🛒' },
+    { id: 'tiktokshop', name: 'TikTok Shop', icon: '🎵' },
+    { id: 'other',      name: 'อื่น ๆ',      icon: '🔗' },
+  ],
+
+  // สถานะคอม — สำคัญมากสำหรับสาย affiliate เพราะคอมถูกยกเลิกได้
+  saleStatuses: [
+    { id: 'รอยืนยัน',  icon: '⏳', cls: 'badge-pending',   counts: false, hint: 'ยังไม่แน่ ลูกค้าคืนของได้อยู่' },
+    { id: 'ยืนยันแล้ว', icon: '👍', cls: 'badge-approved',  counts: true,  hint: 'แพลตฟอร์มยืนยันแล้ว รอโอน' },
+    { id: 'จ่ายแล้ว',   icon: '✅', cls: 'badge-published', counts: true,  hint: 'เงินเข้ากระเป๋าแล้ว' },
+    { id: 'ยกเลิก',    icon: '⛔', cls: 'badge-rejected',  counts: false, hint: 'ลูกค้าคืนของ/ยกเลิกออเดอร์' },
+  ],
+
   pillars: [
     'ขายของ / โปรโมชัน',
     'ให้ความรู้ / How-to',

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="รวมลิงก์สินค้าที่คัดมาแล้ว กดสั่งได้เลย">
+<title>รวมลิงก์สินค้า</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="vendor/tailwind-browser-4.1.13.js"></script>
+<link rel="stylesheet" href="css/app.css">
+<script defer src="js/config.js"></script>
+<script src="vendor/supabase-2.58.0.js"></script>
+<script defer src="js/bio.js"></script>
+<script defer src="vendor/alpine-3.14.9.min.js"></script>
+<style>
+  /* หน้านี้เปิดจากมือถือเป็นหลัก — จัดให้อ่านง่ายด้วยนิ้วโป้งข้างเดียว */
+  body { background: radial-gradient(1200px 500px at 50% -10%, #17243c 0%, var(--page) 60%); }
+  .bio-wrap { max-width: 520px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+  .bio-item {
+    display: flex; align-items: center; gap: .9rem;
+    background: var(--surface-1); border: 1px solid var(--line);
+    border-radius: 14px; padding: .9rem 1rem;
+    text-decoration: none; color: var(--text-1);
+    transition: transform .12s, border-color .12s, background .12s;
+  }
+  .bio-item:hover { transform: translateY(-2px); border-color: var(--accent); background: var(--surface-2); }
+  .bio-item:active { transform: translateY(0); }
+  .bio-thumb {
+    width: 52px; height: 52px; border-radius: 10px; flex-shrink: 0;
+    background: var(--surface-3); display: grid; place-items: center;
+    font-size: 1.4rem; overflow: hidden;
+  }
+  .bio-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .skeleton { height: 76px; border-radius: 14px; background: var(--surface-1); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .5 } 50% { opacity: .85 } }
+</style>
+</head>
+
+<body x-data="bioPage()" x-cloak>
+<div class="bio-wrap">
+
+  <header class="text-center mb-6">
+    <div class="w-16 h-16 rounded-2xl grid place-items-center text-3xl mx-auto mb-3"
+         style="background:var(--accent-soft)" x-text="cfg.emoji"></div>
+    <h1 class="text-xl font-bold" x-text="cfg.title"></h1>
+    <p class="text-sm mt-1.5" style="color:var(--text-2)" x-text="cfg.subtitle"></p>
+  </header>
+
+  <!-- กำลังโหลด -->
+  <div x-show="loading" class="space-y-2.5">
+    <template x-for="i in 4" :key="i"><div class="skeleton"></div></template>
+  </div>
+
+  <!-- โหลดไม่ได้ -->
+  <div x-show="!loading && error" class="card p-5 text-center">
+    <div class="text-2xl mb-2">😕</div>
+    <p class="text-sm" style="color:var(--text-2)" x-text="error"></p>
+  </div>
+
+  <!-- ยังไม่มีสินค้า -->
+  <div x-show="!loading && !error && !items.length" class="card p-6 text-center">
+    <div class="text-2xl mb-2">🛒</div>
+    <p class="text-sm" style="color:var(--text-2)">ยังไม่มีสินค้าในหน้านี้ กลับมาดูใหม่เร็ว ๆ นี้ครับ</p>
+  </div>
+
+  <!-- รายการสินค้า -->
+  <div class="space-y-2.5">
+    <template x-for="item in items" :key="item.id">
+      <a class="bio-item" :href="item.href" target="_blank" rel="noopener sponsored">
+        <div class="bio-thumb">
+          <template x-if="item.image_url"><img :src="item.image_url" :alt="item.name" loading="lazy"></template>
+          <template x-if="!item.image_url"><span x-text="item.icon"></span></template>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold leading-snug line-clamp-2" x-text="item.name"></div>
+          <div class="text-[11px] mt-1" style="color:var(--muted)">
+            <span x-text="item.merchantName"></span>
+            <template x-if="item.price > 0">
+              <span class="num" x-text="' · ' + item.priceText"></span>
+            </template>
+          </div>
+        </div>
+        <span style="color:var(--accent)">→</span>
+      </a>
+    </template>
+  </div>
+
+  <p class="text-[11px] text-center mt-7 leading-relaxed" style="color:var(--muted)" x-text="cfg.footer"></p>
+</div>
+</body>
+</html>

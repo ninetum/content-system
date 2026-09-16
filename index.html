@@ -244,12 +244,17 @@
       <div class="card p-4" x-show="moneyTotals.revenue > 0">
         <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
           <div>
-            <div class="text-xs" style="color:var(--text-2)">💰 รายได้จากคอนเทนต์</div>
+            <div class="text-xs" style="color:var(--text-2)">💰 รายได้ยืนยันแล้ว</div>
             <div class="text-3xl font-bold num mt-1" x-text="fmtBaht(moneyTotals.revenue)"></div>
           </div>
           <div>
-            <div class="text-xs" style="color:var(--text-2)">กำไรสุทธิ</div>
-            <div class="text-xl font-semibold num mt-1" style="color:var(--good)" x-text="fmtBaht(moneyTotals.profit)"></div>
+            <div class="text-xs" style="color:var(--text-2)">รอยืนยัน</div>
+            <div class="text-xl font-semibold num mt-1" style="color:var(--warning)"
+                 x-text="fmtBaht(moneyTotals.pendingRevenue)"></div>
+          </div>
+          <div>
+            <div class="text-xs" style="color:var(--text-2)">EPC ต่อคลิก</div>
+            <div class="text-xl font-semibold num mt-1" x-text="fmtBaht(moneyTotals.epc)"></div>
           </div>
           <div>
             <div class="text-xs" style="color:var(--text-2)">รายได้ต่อ 1,000 วิว</div>
@@ -1143,52 +1148,176 @@
     <section x-show="view==='money'" class="space-y-5">
 
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <template x-for="k in [
-          {t:'รายได้รวม', v:fmtBaht(moneyTotals.revenue), s:'จากคอนเทนต์ทั้งหมด', i:'💰'},
-          {t:'กำไรสุทธิ', v:fmtBaht(moneyTotals.profit), s:'หักต้นทุนและค่าแอดแล้ว', i:'📈'},
-          {t:'จำนวนออร์เดอร์', v:fmtNum(moneyTotals.orders), s:'รายการที่บันทึกไว้', i:'🧾'},
-          {t:'รายได้ต่อ 1,000 วิว', v:fmtBaht(moneyTotals.rpm), s:'ยิ่งสูง คอนเทนต์ยิ่งคุ้ม', i:'🎯'}]" :key="k.t">
-          <div class="card p-4">
-            <div class="flex items-center justify-between">
-              <span class="text-xs" style="color:var(--text-2)" x-text="k.t"></span>
-              <span x-text="k.i"></span>
-            </div>
-            <div class="text-2xl font-bold mt-2 num" x-text="k.v"></div>
-            <div class="text-[11px] mt-0.5" style="color:var(--muted)" x-text="k.s"></div>
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs" style="color:var(--text-2)">รายได้ยืนยันแล้ว</span><span>💰</span>
           </div>
-        </template>
+          <div class="text-2xl font-bold mt-2 num" x-text="fmtBaht(moneyTotals.revenue)"></div>
+          <div class="text-[11px] mt-0.5" style="color:var(--muted)"
+               x-text="`${moneyTotals.orders} ออร์เดอร์ที่ยืนยันแล้ว`"></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs" style="color:var(--text-2)">รอยืนยัน</span><span>⏳</span>
+          </div>
+          <div class="text-2xl font-bold mt-2 num" style="color:var(--warning)"
+               x-text="fmtBaht(moneyTotals.pendingRevenue)"></div>
+          <div class="text-[11px] mt-0.5" style="color:var(--muted)"
+               x-text="`${moneyTotals.pendingOrders} ออร์เดอร์ — ยังถูกยกเลิกได้`"></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs" style="color:var(--text-2)">EPC (รายได้ต่อคลิก)</span><span>🎯</span>
+          </div>
+          <div class="text-2xl font-bold mt-2 num" x-text="fmtBaht(moneyTotals.epc)"></div>
+          <div class="text-[11px] mt-0.5" style="color:var(--muted)"
+               x-text="`จาก ${fmtNum(moneyTotals.clicks)} คลิก`"></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs" style="color:var(--text-2)">กำไรหลังหักค่าแอด</span><span>📈</span>
+          </div>
+          <div class="text-2xl font-bold mt-2 num"
+               :style="moneyTotals.profit >= 0 ? 'color:var(--good)' : 'color:var(--critical)'"
+               x-text="fmtBaht(moneyTotals.profit)"></div>
+          <div class="text-[11px] mt-0.5" style="color:var(--muted)"
+               x-text="moneyTotals.ads > 0 ? `ค่าแอด ${fmtBaht(moneyTotals.ads)} · ROAS ${moneyTotals.roas}x` : 'ยังไม่มีค่าแอด'"></div>
+        </div>
+      </div>
+
+      <!-- ---------- Link-in-bio ---------- -->
+      <div class="card p-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="font-semibold text-sm">🔗 หน้ารวมลิงก์ (Link-in-bio)</h2>
+            <p class="text-[11px] mt-1 leading-relaxed" style="color:var(--text-2)">
+              Facebook กดลิงก์ในโพสต์ทีเดียวได้ลำบาก — เอาลิงก์นี้ไปใส่ใน bio แล้วรวมสินค้าไว้หน้าเดียว
+              ระบบจะนับให้ด้วยว่าคนกดตัวไหนมากที่สุด ซึ่ง Shopee ไม่เคยบอกคุณ
+            </p>
+          </div>
+          <button class="btn btn-primary btn-sm shrink-0" @click="buildBioLinks()">⚡ เตรียมลิงก์หน้า bio</button>
+        </div>
+
+        <div class="flex items-center gap-1.5 mt-3">
+          <input class="field text-xs" readonly :value="bioUrl">
+          <button class="btn btn-ghost btn-sm" @click="copyText(bioUrl, 'คัดลอกลิงก์หน้า bio แล้ว')">คัดลอก</button>
+          <a class="btn btn-ghost btn-sm" :href="bioUrl" target="_blank" rel="noopener">เปิดดู</a>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mt-3">
+          <template x-for="p in bioProducts" :key="p.id">
+            <span class="card-2 px-2 py-1 rounded text-[11px] flex items-center gap-1.5">
+              <span x-text="bioLink(p) ? '✅' : '⚠️'"></span>
+              <span x-text="p.name"></span>
+              <template x-if="bioLink(p)">
+                <span class="num font-semibold" x-text="clicksOf(bioLink(p).id) + ' คลิก'"></span>
+              </template>
+            </span>
+          </template>
+          <span x-show="!bioProducts.length" class="text-[11px]" style="color:var(--muted)">
+            ยังไม่มีสินค้าที่ติ๊กให้โชว์ในหน้า bio
+          </span>
+        </div>
       </div>
 
       <!-- ---------- สินค้า ---------- -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="font-semibold text-sm">สินค้าที่ขาย</h2>
-            <p class="text-[11px]" style="color:var(--muted)">ใส่ลิงก์หน้าสินค้าไว้ ระบบจะเอาไปสร้างลิงก์ติดตามผลให้เอง</p>
+            <h2 class="font-semibold text-sm">สินค้าที่ทำเงินให้เรา</h2>
+            <p class="text-[11px]" style="color:var(--muted)">
+              ใส่ลิงก์ affiliate ไว้ ระบบจะห่อเป็นลิงก์ติดตามผลให้เอง
+            </p>
           </div>
           <button class="btn btn-primary btn-sm" @click="newProduct()">✚ เพิ่มสินค้า</button>
         </div>
 
         <template x-if="productForm">
         <div class="card p-4 space-y-3">
+          <div>
+            <label class="label">รูปแบบรายได้</label>
+            <div class="flex gap-2">
+              <template x-for="t in cfg.productTypes" :key="t.id">
+                <button class="flex-1 card-2 p-2.5 text-left transition"
+                        :style="productForm.product_type===t.id ? 'border-color:var(--accent); background:var(--accent-soft)' : ''"
+                        @click="productForm.product_type=t.id">
+                  <div class="text-sm font-semibold"><span x-text="t.icon"></span> <span x-text="t.name"></span></div>
+                  <div class="text-[10px] mt-0.5" style="color:var(--muted)" x-text="t.hint"></div>
+                </button>
+              </template>
+            </div>
+          </div>
+
           <div class="grid md:grid-cols-2 gap-3">
             <div class="md:col-span-2"><label class="label">ชื่อสินค้า</label>
-              <input class="field" x-model="productForm.name" placeholder="เช่น กล่องท้ายรถ 45 ลิตร"></div>
-            <div><label class="label">รหัสสินค้า (SKU)</label><input class="field" x-model="productForm.sku"></div>
-            <div><label class="label">ลิงก์หน้าสินค้า</label>
-              <input class="field" x-model="productForm.url" placeholder="https://…"></div>
-            <div><label class="label">ราคาขาย (บาท)</label>
+              <input class="field" x-model="productForm.name" placeholder="เช่น หูฟังบลูทูธ รุ่น X / ทัวร์เชียงใหม่ 3 วัน 2 คืน"></div>
+
+            <div x-show="productForm.product_type==='affiliate'">
+              <label class="label">มาร์เก็ตเพลส</label>
+              <select class="field" x-model="productForm.merchant">
+                <template x-for="m in cfg.merchants" :key="m.id">
+                  <option :value="m.id" x-text="m.icon + ' ' + m.name"></option>
+                </template>
+              </select>
+            </div>
+
+            <div><label class="label">รหัส/SKU</label><input class="field" x-model="productForm.sku"></div>
+
+            <div class="md:col-span-2">
+              <label class="label" x-text="productForm.product_type==='affiliate' ? 'ลิงก์ affiliate ของคุณ' : 'ลิงก์หน้าจอง/หน้าสินค้า'"></label>
+              <input class="field" x-model="productForm.url" placeholder="https://s.shopee.co.th/…">
+            </div>
+
+            <div><label class="label">ราคาสินค้า (บาท)</label>
               <input type="number" class="field num" x-model="productForm.price"></div>
-            <div><label class="label">ต้นทุน (บาท)</label>
-              <input type="number" class="field num" x-model="productForm.cost"></div>
-            <div class="md:col-span-2"><label class="label">โน้ต</label><input class="field" x-model="productForm.note"></div>
+
+            <template x-if="productForm.product_type==='affiliate'">
+              <div><label class="label">คอมมิชชั่น (%)</label>
+                <input type="number" step="0.1" class="field num" x-model="productForm.commission_rate"></div>
+            </template>
+            <template x-if="productForm.product_type==='affiliate'">
+              <div><label class="label">หรือคอมคงที่ต่อออเดอร์ (บาท)</label>
+                <input type="number" class="field num" x-model="productForm.commission_fixed"
+                       placeholder="เว้น 0 ถ้าคิดเป็น %"></div>
+            </template>
+
+            <template x-if="productForm.product_type==='own'">
+              <div><label class="label">ต้นทุน (บาท)</label>
+                <input type="number" class="field num" x-model="productForm.cost"></div>
+            </template>
+            <template x-if="productForm.product_type==='own'">
+              <div><label class="label">รอบเดินทาง / วันที่ใช้บริการ</label>
+                <input type="datetime-local" class="field" x-model="productForm.event_date"></div>
+            </template>
+            <template x-if="productForm.product_type==='own'">
+              <div><label class="label">ที่นั่งทั้งหมด (0 = ไม่จำกัด)</label>
+                <input type="number" class="field num" x-model="productForm.capacity"></div>
+            </template>
+
+            <div class="md:col-span-2"><label class="label">โน้ต</label>
+              <input class="field" x-model="productForm.note"></div>
           </div>
-          <div class="text-xs" style="color:var(--text-2)"
-               x-text="`กำไรต่อชิ้น ${fmtBaht(margin(productForm).baht)} (${margin(productForm).pct}%)`"></div>
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" class="w-4 h-4 accent-blue-500" x-model="productForm.active">
-            <span>ยังขายอยู่</span>
-          </label>
+
+          <div class="card-2 p-2.5 text-xs" style="color:var(--text-2)">
+            <span x-text="earnPerUnit(productForm).label"></span> ที่ได้ต่อ 1 ออเดอร์:
+            <span class="num font-bold" style="color:var(--good)" x-text="fmtBaht(earnPerUnit(productForm).baht)"></span>
+            <span class="num" x-text="`(${earnPerUnit(productForm).pct}%)`"></span>
+          </div>
+
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" class="w-4 h-4 accent-blue-500" x-model="productForm.active">
+              <span>ยังขายอยู่</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" class="w-4 h-4 accent-blue-500" x-model="productForm.in_bio">
+              <span>โชว์ในหน้า link-in-bio</span>
+            </label>
+          </div>
+
           <div class="flex gap-2">
             <button class="btn btn-primary" @click="saveProduct()">บันทึก</button>
             <button class="btn btn-ghost" @click="productForm=null">ยกเลิก</button>
@@ -1208,22 +1337,38 @@
             <div class="card p-4">
               <div class="flex items-start gap-2">
                 <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold text-sm truncate" x-text="p.name"></h3>
-                  <p class="text-[11px]" style="color:var(--muted)" x-text="p.sku || '—'"></p>
+                  <div class="flex items-center gap-1.5 flex-wrap text-[11px]" style="color:var(--muted)">
+                    <span x-text="productTypeInfo(p.product_type).icon + ' ' + productTypeInfo(p.product_type).name"></span>
+                    <template x-if="(p.product_type||'affiliate')==='affiliate'">
+                      <span x-text="'· ' + merchantInfo(p.merchant).icon + ' ' + merchantInfo(p.merchant).name"></span>
+                    </template>
+                  </div>
+                  <h3 class="font-semibold text-sm truncate mt-1" x-text="p.name"></h3>
                 </div>
                 <span class="badge shrink-0" :class="p.active ? 'badge-published' : 'badge-draft'">
                   <span x-text="p.active ? '✅' : '⏸️'"></span>
                   <span x-text="p.active ? 'ขายอยู่' : 'พัก'"></span>
                 </span>
               </div>
-              <div class="flex items-baseline gap-2 mt-2">
-                <span class="text-xl font-bold num" x-text="fmtBaht(p.price)"></span>
+
+              <div class="flex items-baseline gap-2 mt-2 flex-wrap">
+                <span class="text-lg font-bold num" x-text="fmtBaht(p.price)"></span>
                 <span class="text-[11px] num" style="color:var(--good)"
-                      x-text="`กำไร ${fmtBaht(margin(p).baht)} (${margin(p).pct}%)`"></span>
+                      x-text="`${earnPerUnit(p).label} ${fmtBaht(earnPerUnit(p).baht)} (${earnPerUnit(p).pct}%)`"></span>
               </div>
+
+              <template x-if="(p.product_type||'affiliate')==='own' && p.event_date">
+                <div class="text-[11px] mt-1" style="color:var(--text-2)">
+                  🗓️ รอบ <span x-text="fmtDate(p.event_date, false)"></span>
+                  <template x-if="p.capacity > 0">
+                    <span x-text="` · ที่นั่ง ${p.capacity}`"></span>
+                  </template>
+                </div>
+              </template>
+
               <div class="flex gap-2 mt-3">
                 <button class="btn btn-ghost btn-sm" @click="editProduct(p)">แก้ไข</button>
-                <a x-show="p.url" class="btn btn-ghost btn-sm" :href="p.url" target="_blank" rel="noopener">เปิดหน้าสินค้า</a>
+                <a x-show="p.url" class="btn btn-ghost btn-sm" :href="p.url" target="_blank" rel="noopener">เปิดลิงก์</a>
                 <button class="btn btn-danger btn-sm ml-auto" @click="deleteProduct(p)">ลบ</button>
               </div>
             </div>
@@ -1231,14 +1376,16 @@
         </div>
       </div>
 
-      <!-- ---------- ยอดขาย ---------- -->
+      <!-- ---------- ยอดขาย / คอมมิชชั่น ---------- -->
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h2 class="font-semibold text-sm">ยอดขายที่เกิดจากคอนเทนต์</h2>
-            <p class="text-[11px]" style="color:var(--muted)">บันทึกทุกครั้งที่ปิดการขายได้ แล้วระบบจะบอกเองว่าโพสต์ไหนทำเงิน</p>
+            <h2 class="font-semibold text-sm">ออร์เดอร์ที่เกิดจากคอนเทนต์</h2>
+            <p class="text-[11px]" style="color:var(--muted)">
+              บันทึกตอนเห็นออร์เดอร์ในแอป Shopee แล้วมาเปลี่ยนสถานะทีหลังตอนคอมยืนยัน
+            </p>
           </div>
-          <button class="btn btn-primary btn-sm" @click="newSale()">✚ บันทึกยอดขาย</button>
+          <button class="btn btn-primary btn-sm" @click="newSale()">✚ บันทึกออร์เดอร์</button>
         </div>
 
         <template x-if="saleForm">
@@ -1252,6 +1399,7 @@
               <option value="">— ไม่ระบุ —</option>
               <template x-for="c in db.channels" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
             </select></div>
+
           <div><label class="label">สินค้า</label>
             <select class="field" x-model="saleForm.product_id" @change="fillSaleAmounts()">
               <option value="">— ไม่ระบุ —</option>
@@ -1261,10 +1409,27 @@
             <input type="number" class="field num" x-model="saleForm.qty" @change="fillSaleAmounts()"></div>
           <div><label class="label">ยอดขาย (บาท)</label>
             <input type="number" class="field num" x-model="saleForm.amount"></div>
-          <div><label class="label">ต้นทุนรวม (บาท)</label>
-            <input type="number" class="field num" x-model="saleForm.cost_amount"></div>
+
+          <template x-if="saleFormIsAffiliate">
+            <div><label class="label">คอมที่ได้ (บาท)</label>
+              <input type="number" class="field num" x-model="saleForm.commission"></div>
+          </template>
+          <template x-if="!saleFormIsAffiliate">
+            <div><label class="label">ต้นทุนรวม (บาท)</label>
+              <input type="number" class="field num" x-model="saleForm.cost_amount"></div>
+          </template>
+
           <div><label class="label">ค่าแอดที่ลงไป (บาท)</label>
             <input type="number" class="field num" x-model="saleForm.ad_spend"></div>
+          <div><label class="label">สถานะ</label>
+            <select class="field" x-model="saleForm.status">
+              <template x-for="st in cfg.saleStatuses" :key="st.id">
+                <option :value="st.id" x-text="st.icon + ' ' + st.id"></option>
+              </template>
+            </select></div>
+          <div><label class="label">เลขออเดอร์ (ถ้ามี)</label>
+            <input class="field" x-model="saleForm.order_ref" placeholder="เช่น 2409XXXXXX"></div>
+
           <div class="md:col-span-3 flex items-end gap-2">
             <button class="btn btn-primary" @click="saveSale()">บันทึก</button>
             <button class="btn btn-ghost" @click="saleForm=null">ยกเลิก</button>
@@ -1273,7 +1438,7 @@
         </template>
 
         <template x-if="!db.sales.length">
-          <p class="text-sm py-6 text-center" style="color:var(--muted)">ยังไม่มียอดขายที่บันทึกไว้</p>
+          <p class="text-sm py-6 text-center" style="color:var(--muted)">ยังไม่มีออร์เดอร์ที่บันทึกไว้</p>
         </template>
 
         <div x-show="db.sales.length" class="overflow-x-auto">
@@ -1283,7 +1448,8 @@
                 <th class="text-left font-medium py-2">วันที่</th>
                 <th class="text-left font-medium py-2">คอนเทนต์ / สินค้า</th>
                 <th class="text-right font-medium py-2">ยอดขาย</th>
-                <th class="text-right font-medium py-2">กำไร</th>
+                <th class="text-right font-medium py-2">เราได้</th>
+                <th class="text-left font-medium py-2 pl-3">สถานะ</th>
                 <th class="py-2"></th>
               </tr>
             </thead>
@@ -1292,13 +1458,23 @@
                 <tr class="hairline">
                   <td class="py-2 text-[11px] num" style="color:var(--muted)" x-text="fmtDate(s.sold_at, false)"></td>
                   <td class="py-2 pr-3">
-                    <div class="truncate max-w-[280px]" x-text="contentById(s.content_id)?.title || '—'"></div>
+                    <div class="truncate max-w-[260px]" x-text="contentById(s.content_id)?.title || '—'"></div>
                     <div class="text-[11px]" style="color:var(--muted)"
                          x-text="(productById(s.product_id)?.name || 'ไม่ระบุสินค้า') + ' × ' + s.qty"></div>
                   </td>
                   <td class="py-2 text-right num" x-text="fmtBaht(s.amount)"></td>
-                  <td class="py-2 text-right num" style="color:var(--good)"
-                      x-text="fmtBaht((Number(s.amount)||0)-(Number(s.cost_amount)||0)-(Number(s.ad_spend)||0))"></td>
+                  <td class="py-2 text-right num font-semibold"
+                      :style="countsAsRevenue(s) ? 'color:var(--good)' : 'color:var(--muted)'"
+                      x-text="fmtBaht(netOf(s))"></td>
+                  <td class="py-2 pl-3">
+                    <select class="field text-[11px] py-1 w-auto"
+                            @change="setSaleStatus(s, $event.target.value)">
+                      <template x-for="st in cfg.saleStatuses" :key="st.id">
+                        <option :value="st.id" :selected="st.id === (s.status || 'รอยืนยัน')"
+                                x-text="st.icon + ' ' + st.id"></option>
+                      </template>
+                    </select>
+                  </td>
                   <td class="py-2 text-right">
                     <button class="btn btn-danger btn-sm" @click="deleteSale(s)">ลบ</button>
                   </td>
@@ -1313,7 +1489,7 @@
       <div class="grid lg:grid-cols-2 gap-3">
         <div class="card p-4">
           <h2 class="font-semibold text-sm mb-1">คอนเทนต์ที่ทำเงินที่สุด</h2>
-          <p class="text-[11px] mb-3" style="color:var(--muted)">หน่วย: บาท</p>
+          <p class="text-[11px] mb-3" style="color:var(--muted)">หน่วย: บาท (นับเฉพาะที่ยืนยันแล้ว)</p>
           <template x-if="!revenueRanking.length">
             <p class="text-sm py-4 text-center" style="color:var(--muted)">ยังไม่มีข้อมูล</p>
           </template>
@@ -1326,15 +1502,17 @@
                 </div>
                 <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
                 <div class="text-[10px] mt-1 num" style="color:var(--muted)"
-                     x-text="`${fmtNum(r.clicks)} คลิก · ${r.orders} ออร์เดอร์ · ${fmtBaht(r.rpm)}/1,000 วิว`"></div>
+                     x-text="`${fmtNum(r.clicks)} คลิก · EPC ${fmtBaht(r.epc)} · ${r.orders} ออร์เดอร์`"></div>
               </div>
             </template>
           </div>
         </div>
 
         <div class="card p-4">
-          <h2 class="font-semibold text-sm mb-1">สินค้าขายดี</h2>
-          <p class="text-[11px] mb-3" style="color:var(--muted)">หน่วย: บาท</p>
+          <h2 class="font-semibold text-sm mb-1">สินค้าที่ควรดันต่อ</h2>
+          <p class="text-[11px] mb-3" style="color:var(--muted)">
+            เรียงตามรายได้ — ดู EPC ประกอบ ตัวที่ EPC สูงคือตัวที่ควรทำคอนเทนต์เพิ่ม
+          </p>
           <template x-if="!productRanking.length">
             <p class="text-sm py-4 text-center" style="color:var(--muted)">ยังไม่มีข้อมูล</p>
           </template>
@@ -1346,7 +1524,8 @@
                   <span class="num font-semibold" x-text="fmtBaht(r.revenue)"></span>
                 </div>
                 <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
-                <div class="text-[10px] mt-1 num" style="color:var(--muted)" x-text="`ขายได้ ${r.qty} ชิ้น`"></div>
+                <div class="text-[10px] mt-1 num" style="color:var(--muted)"
+                     x-text="`${r.qty} ชิ้น · ${fmtNum(r.clicks)} คลิก · EPC ${fmtBaht(r.epc)}` + (r.pending ? ` · รอยืนยัน ${fmtBaht(r.pending)}` : '')"></div>
               </div>
             </template>
           </div>

@@ -326,3 +326,39 @@ begin
       t || '_touch', t);
   end loop;
 end $$;
+
+-- ============================================================
+-- โมเดลรายได้ 2 แบบในระบบเดียว
+--   affiliate = ได้คอมมิชชั่น (Shopee / Lazada / TikTok Shop)
+--   own       = ขายเอง เช่น ตั๋วทัวร์ มีต้นทุน มีกำไร มีรอบเดินทาง
+-- ============================================================
+
+alter table public.products add column if not exists product_type     text default 'affiliate'; -- affiliate | own
+alter table public.products add column if not exists merchant         text default 'shopee';
+alter table public.products add column if not exists commission_rate  numeric(5,2) default 0;   -- % ต่อยอดขาย
+alter table public.products add column if not exists commission_fixed numeric(12,2) default 0;  -- หรือคอมคงที่ต่อออเดอร์
+alter table public.products add column if not exists in_bio           boolean default true;     -- โชว์ในหน้า link-in-bio
+alter table public.products add column if not exists sort_order       integer default 0;
+alter table public.products add column if not exists event_date       timestamptz;              -- รอบเดินทาง (ทัวร์)
+alter table public.products add column if not exists capacity         integer default 0;        -- ที่นั่งทั้งหมด (0 = ไม่จำกัด)
+
+create index if not exists products_type_idx on public.products (product_type);
+
+-- ยอดขาย: แยก "ยอดขาย" ออกจาก "คอมที่ได้จริง"
+-- คอม affiliate ถูกยกเลิกได้ถ้าลูกค้าคืนของ จึงต้องมีสถานะกำกับเสมอ
+alter table public.sales add column if not exists commission numeric(12,2) default 0;
+alter table public.sales add column if not exists status     text default 'รอยืนยัน';  -- รอยืนยัน|ยืนยันแล้ว|จ่ายแล้ว|ยกเลิก
+alter table public.sales add column if not exists order_ref  text default '';
+
+create index if not exists sales_status_idx on public.sales (status);
+
+-- ลิงก์ที่โชว์ในหน้า link-in-bio ต้องให้คนทั่วไปอ่านได้โดยไม่ต้องล็อกอิน
+alter table public.tracked_links add column if not exists public_bio boolean default false;
+
+drop policy if exists products_public_bio on public.products;
+create policy products_public_bio on public.products
+  for select to anon using (in_bio = true and active = true);
+
+drop policy if exists tracked_links_public_bio on public.tracked_links;
+create policy tracked_links_public_bio on public.tracked_links
+  for select to anon using (public_bio = true);

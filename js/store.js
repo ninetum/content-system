@@ -180,7 +180,7 @@ window.Store = (function () {
     return out;
   }
 
-  async function createLink({ content_id, channel_id, product_id, target_url, label }) {
+  async function createLink({ content_id, channel_id, product_id, target_url, label, public_bio }) {
     if (!target_url) throw new Error('ยังไม่มีปลายทางของลิงก์ (ใส่ลิงก์สินค้าหรือหน้าร้านก่อน)');
 
     let code = newCode();
@@ -192,6 +192,7 @@ window.Store = (function () {
     return create('links', {
       code, content_id: content_id || null, channel_id: channel_id || null,
       product_id: product_id || null, target_url, label: label || '',
+      public_bio: !!public_bio,
     });
   }
 
