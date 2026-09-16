@@ -212,3 +212,14 @@ create policy publish_results_read on public.publish_results
 drop trigger if exists publish_results_touch on public.publish_results;
 create trigger publish_results_touch before update on public.publish_results
   for each row execute function public.touch_updated_at();
+
+-- ============================================================
+-- คอลัมน์เพิ่มสำหรับ worker ตัดต่อบนเครื่อง (รันซ้ำได้ ไม่พัง)
+-- ============================================================
+alter table public.edit_jobs add column if not exists error       text default '';
+alter table public.edit_jobs add column if not exists claimed_at  timestamptz;
+alter table public.edit_jobs add column if not exists finished_at timestamptz;
+alter table public.edit_jobs add column if not exists worker      text default '';
+alter table public.edit_jobs add column if not exists log_tail    text default '';
+
+create index if not exists edit_jobs_status_idx on public.edit_jobs (status);

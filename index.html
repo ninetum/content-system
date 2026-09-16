@@ -886,15 +886,32 @@
       <div class="card p-4">
         <h2 class="font-semibold text-sm mb-1">✂️ โรงตัดคลิป — ใบสั่งงานตัดต่อ</h2>
         <p class="text-xs leading-relaxed" style="color:var(--text-2)">
-          หน้านี้คือ “ใบสั่งงาน” ไม่ใช่ตัวตัดต่อเอง — เว็บบันทึกโจทย์ไว้ แล้วสร้างคำสั่งพร้อมคัดลอก
-          ไปวางให้ agent ที่เครื่องคุณ (ii23 edit kit) เป็นคนตัดจริง
-          เพราะงานตัดคลิปต้องใช้ ffmpeg / CapCut / ไฟล์วิดีโอในเครื่อง ซึ่งรันบนโฮสต์เว็บไม่ได้
+          งานตัดคลิปต้องใช้ ffmpeg / CapCut / ไฟล์วิดีโอในเครื่อง ซึ่งรันบนโฮสต์เว็บไม่ได้
+          เว็บจึงทำหน้าที่ออก “ใบสั่งงาน” แล้วให้เครื่องคุณเป็นโรงตัด ใช้ได้ 2 แบบ:
         </p>
+        <div class="grid sm:grid-cols-2 gap-2 mt-3">
+          <div class="card-2 p-3">
+            <div class="text-xs font-semibold mb-1">📋 แบบคัดลอกเอง</div>
+            <p class="text-[11px]" style="color:var(--text-2)">
+              กด “สร้างคำสั่งสำหรับ agent” แล้วคัดลอกไปวางในหน้าต่าง agent ที่เครื่องคุณ — ใช้ได้ทันที ไม่ต้องตั้งอะไร
+            </p>
+          </div>
+          <div class="card-2 p-3">
+            <div class="text-xs font-semibold mb-1">🤖 แบบอัตโนมัติ</div>
+            <p class="text-[11px]" style="color:var(--text-2)">
+              เปิด <code>worker/edit_worker.py</code> ค้างไว้บนเครื่อง มันจะรับงานไปตัดเอง
+              อัปไฟล์กลับเข้าระบบ แล้วเปลี่ยนสถานะให้ — ดูวิธีตั้งที่ <code>worker/README.md</code>
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-2">
         <p class="text-sm" style="color:var(--text-2)">งานตัดต่อทั้งหมด</p>
-        <button class="btn btn-primary btn-sm" @click="newJob()">✚ เปิดใบสั่งงาน</button>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" @click="refreshJobs()">🔄 อัปเดตสถานะ</button>
+          <button class="btn btn-primary btn-sm" @click="newJob()">✚ เปิดใบสั่งงาน</button>
+        </div>
       </div>
 
       <template x-if="jobForm">
@@ -977,9 +994,12 @@
             <div class="flex flex-wrap items-start gap-3">
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="badge badge-approved" x-text="j.status"></span>
+                  <span class="badge" :class="jobBadge(j.status)" x-text="j.status"></span>
                   <span class="text-[11px] num" style="color:var(--muted)"
                         x-text="`${j.aspect} · ~${j.target_sec} วิ`"></span>
+                  <template x-if="j.worker">
+                    <span class="text-[11px]" style="color:var(--muted)" x-text="'🖥️ ' + j.worker"></span>
+                  </template>
                 </div>
                 <h3 class="font-semibold mt-1.5 text-sm" x-text="j.title"></h3>
                 <p class="text-[11px] mt-1 truncate" style="color:var(--muted)" x-text="j.source || 'ยังไม่ระบุไฟล์ต้นทาง'"></p>
@@ -990,11 +1010,33 @@
                   <span class="card-2 px-2 py-0.5 rounded" x-show="j.bgm">🎵 เพลง</span>
                   <span class="card-2 px-2 py-0.5 rounded" x-show="j.sfx">🔊 SFX</span>
                 </div>
+
+                <template x-if="j.result_url">
+                  <div class="mt-3">
+                    <video :src="j.result_url" controls preload="metadata"
+                           class="w-full max-w-xs rounded-lg" style="background:#000"></video>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                      <button class="btn btn-primary btn-sm" @click="attachResult(j)"
+                              x-show="j.content_id">📎 แนบเข้าคอนเทนต์</button>
+                      <a class="btn btn-ghost btn-sm" :href="j.result_url" target="_blank" rel="noopener">เปิดไฟล์</a>
+                      <button class="btn btn-ghost btn-sm" @click="copyText(j.result_url, 'คัดลอกลิงก์แล้ว')">คัดลอกลิงก์</button>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="j.error">
+                  <div class="mt-2 p-2.5 rounded-lg text-[11px] whitespace-pre-line"
+                       style="background:rgba(208,59,59,.1); border:1px solid rgba(208,59,59,.3); color:#f0a3a3">
+                    <span class="font-semibold">ตัดไม่สำเร็จ:</span>
+                    <span x-text="j.error"></span>
+                  </div>
+                </template>
               </div>
               <div class="flex flex-col gap-1.5 shrink-0">
                 <button class="btn btn-ghost btn-sm" @click="editJob(j)">เปิดดู / คัดลอกคำสั่ง</button>
                 <select class="field text-xs" :value="j.status" @change="setJobStatus(j, $event.target.value)">
-                  <option>รอเริ่มงาน</option><option>กำลังตัด</option><option>รอตรวจ</option><option>เสร็จแล้ว</option>
+                  <option>รอเริ่มงาน</option><option>กำลังตัด</option><option>รอตรวจ</option>
+                  <option>เสร็จแล้ว</option><option>ตัดไม่สำเร็จ</option>
                 </select>
                 <button class="btn btn-danger btn-sm" @click="deleteJob(j)">ลบ</button>
               </div>

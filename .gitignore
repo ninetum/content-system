@@ -11,3 +11,7 @@ ii23-edit-kit*/
 .DS_Store
 node_modules/
 .vercel
+
+# ค่าตั้งของ worker (มี service_role key)
+worker/.env
+worker/__pycache__/

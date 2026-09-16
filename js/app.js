@@ -727,7 +727,7 @@ function cmsApp() {
           ? `3. ii23-transcribe: ถอดเสียงเป็นซับไทย แล้วใส่ซับใน CapCut สไตล์ "${j.sub_style}"${j.bilingual ? ' และทำซับ 2 ภาษา (ไทย+อังกฤษ) คนละแทร็ก' : ''}`
           : '3. ไม่ต้องใส่ซับ',
         j.bgm || j.sfx
-          ? `4. ii23-find-assets: หา${j.bgm ? `เพลงประกอบโทน "${j.bgm_mood}"` : ''}${j.bgm && j.sfx ? ' และ' : ''}${j.sfx ? 'SFX ตามจังหวะที่เปลี่ยนประเด็น' : ''} (ใช้แหล่งที่ลิขสิทธิ์ใช้เชิงพาณิชย์ได้)`
+          ? `4. ii23-find-assets: หา${j.bgm ? `เพลงประกอบโทน "${j.bgm_mood}"` : ''}${j.bgm && j.sfx ? ' และ ' : ''}${j.sfx ? 'SFX ตามจังหวะที่เปลี่ยนประเด็น' : ''} (ใช้แหล่งที่ลิขสิทธิ์ใช้เชิงพาณิชย์ได้)`
           : '4. ไม่ต้องใส่เพลง/SFX',
         `5. จังหวะตัด/ทรานซิชัน: ${j.transition}`,
         '6. รัน ii23-capcut/scripts/qc_edit.py จนผ่าน แล้วค่อยส่งงาน',
@@ -765,6 +765,45 @@ function cmsApp() {
         this.refresh();
       }, `อัปเดตสถานะงานเป็น "${status}"`);
     },
+    // ดึงสถานะงานล่าสุดจากฐานข้อมูล (worker เป็นคนอัปเดต)
+    async refreshJobs() {
+      await this.run(async () => {
+        await Store.loadAll();
+        this.refresh();
+      }, 'อัปเดตสถานะงานล่าสุดแล้ว');
+    },
+
+    jobBadge(status) {
+      return {
+        'รอเริ่มงาน':    'badge-draft',
+        'กำลังตัด':      'badge-pending',
+        'รอตรวจ':        'badge-approved',
+        'เสร็จแล้ว':      'badge-published',
+        'ตัดไม่สำเร็จ':   'badge-rejected',
+      }[status] || 'badge-draft';
+    },
+
+    // เอาคลิปที่ตัดเสร็จไปแนบกับคอนเทนต์ที่ผูกไว้ แล้วเปิดหน้าแก้ไขต่อได้เลย
+    async attachResult(j) {
+      if (!j.result_url) { this.toast('งานนี้ยังไม่มีไฟล์ผลลัพธ์ครับ', 'warn'); return; }
+      const content = this.contentById(j.content_id);
+      if (!content) { this.toast('ใบสั่งงานนี้ไม่ได้ผูกกับคอนเทนต์ไหนไว้', 'warn'); return; }
+
+      await this.run(async () => {
+        let media = this.db.media.find((m) => m.url === j.result_url);
+        if (!media) {
+          media = await Store.create('media', {
+            name: j.title || 'คลิปตัดเสร็จ', url: j.result_url, kind: 'video',
+            tags: ['ตัดจากโรงตัดคลิป'], size_kb: 0,
+          });
+        }
+        const ids = [...new Set([...(content.media_ids || []), media.id])];
+        await Store.update('contents', content.id, { media_ids: ids });
+        await this.log(content.id, 'แนบคลิปที่ตัดเสร็จ', j.title || '');
+        this.refresh();
+      }, `แนบคลิปเข้ากับ "${content.title}" แล้ว`);
+    },
+
     async deleteJob(j) {
       if (!confirm(`ลบใบสั่งงาน "${j.title}" ไหมครับ?`)) return;
       await this.run(async () => {
