@@ -19,6 +19,7 @@ function cmsApp() {
     needLogin: false,
     authBusy: false,
     login: { email: '', password: '', mode: 'password' },   // password | link
+    publishing: '',                                          // id ของคอนเทนต์ที่กำลังยิง API
 
     // ตัวกรอง
     search: '',
@@ -126,6 +127,16 @@ function cmsApp() {
       } catch (e) {
         this.toast(e.message || String(e), 'err');
       } finally {
+        this.authBusy = false;
+      }
+    },
+
+    async doGoogleLogin() {
+      this.authBusy = true;
+      try {
+        await Store.signInWithGoogle();   // พาไปหน้า Google ต่อ
+      } catch (e) {
+        this.toast(e.message || String(e), 'err');
         this.authBusy = false;
       }
     },
@@ -412,6 +423,30 @@ function cmsApp() {
         await this.log(c.id, this.status(status).name, note);
         this.refresh();
       }, `อัปเดตสถานะเป็น "${this.status(status).name}" แล้ว`);
+    },
+
+    // โพสต์ผ่าน API จริง (ต้องอยู่ในโหมด Supabase + ล็อกอิน + ผูกโทเคนไว้แล้ว)
+    get canPublishApi() { return this.mode === 'supabase' && !!this.session; },
+
+    async publishViaApi(c) {
+      const names = (c.channel_ids || []).map((id) => this.channelById(id)?.name).filter(Boolean).join(', ');
+      if (!confirm(`โพสต์ "${c.title}" ขึ้น ${names || 'ช่องที่เลือกไว้'} ตอนนี้เลยไหมครับ?`)) return;
+
+      this.publishing = c.id;
+      try {
+        const r = await Store.publishNow(c.id);
+        this.refresh();
+        const okList = (r.results || []).filter((x) => x.ok).map((x) => x.channel);
+        const failList = (r.results || []).filter((x) => !x.ok);
+
+        if (okList.length) this.toast(`โพสต์ขึ้น ${okList.join(', ')} แล้ว`, 'ok');
+        for (const f of failList) this.toast(`${f.channel || 'บางช่อง'}: ${f.error}`, 'err');
+        if (!okList.length && !failList.length) this.toast('ไม่มีช่องที่โพสต์ได้', 'warn');
+      } catch (e) {
+        this.toast(e.message || String(e), 'err');
+      } finally {
+        this.publishing = '';
+      }
     },
 
     async duplicateContent(c) {

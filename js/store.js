@@ -154,6 +154,39 @@ window.Store = (function () {
     writeLocal();
   }
 
+  /* ---------- โพสต์จริงผ่าน Edge Function ----------
+   * หน้าเว็บไม่เคยเห็น access token ของ Facebook/IG/LINE เลย
+   * แค่ส่งคำสั่งพร้อมเซสชันของผู้ใช้ไปให้ฝั่งเซิร์ฟเวอร์เป็นคนยิง API
+   */
+  async function publishNow(contentId, channelIds) {
+    if (state.mode !== 'supabase' || !state.client) {
+      throw new Error('ต้องเชื่อม Supabase และเข้าสู่ระบบก่อนถึงจะโพสต์ผ่าน API ได้ครับ');
+    }
+    if (!state.session) throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+
+    const res = await fetch(`${state.url.replace(/\/$/, '')}/functions/v1/publish-post`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: state.key,
+        Authorization: `Bearer ${state.session.access_token}`,
+      },
+      body: JSON.stringify({ content_id: contentId, channel_ids: channelIds || undefined }),
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch { /* ตอบกลับไม่ใช่ JSON */ }
+
+    if (res.status === 404) {
+      throw new Error('ยังไม่ได้ deploy ฟังก์ชัน publish-post (รัน: supabase functions deploy publish-post)');
+    }
+    if (!res.ok && !data.results) {
+      throw new Error(data.error || `โพสต์ไม่สำเร็จ (HTTP ${res.status})`);
+    }
+    await loadAll();
+    return data;
+  }
+
   /* ---------- ทดสอบการเชื่อมต่อ ---------- */
   async function testConnection(url, key) {
     const client = makeClient(url, key);
@@ -192,6 +225,21 @@ window.Store = (function () {
     if (error) throw new Error(translateAuthError(error.message));
   }
 
+  // เข้าสู่ระบบด้วยบัญชี Google (Gmail)
+  // ต้องเปิด provider Google ใน Supabase Dashboard → Authentication → Sign In / Providers ก่อน
+  async function signInWithGoogle() {
+    if (!state.client) throw new Error('ยังไม่ได้เชื่อม Supabase — ไปตั้งค่าที่หน้า “ตั้งค่าระบบ” ก่อนครับ');
+    const { error } = await state.client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+    if (error) throw new Error(translateAuthError(error.message));
+    // เบราว์เซอร์จะถูกพาไปหน้า Google แล้วเด้งกลับมาที่เว็บนี้พร้อมเซสชัน
+  }
+
   async function resetPassword(email) {
     if (!state.client) throw new Error('ยังไม่ได้เชื่อม Supabase ครับ');
     const { error } = await state.client.auth.resetPasswordForEmail(email, {
@@ -221,6 +269,7 @@ window.Store = (function () {
     if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — เช็กกล่องจดหมายก่อนนะครับ';
     if (m.includes('rate limit') || m.includes('too many')) return 'ขอบ่อยเกินไป รอสักครู่แล้วลองใหม่ครับ';
     if (m.includes('signups not allowed')) return 'ระบบปิดการสมัครเอง — ให้แอดมินเพิ่มผู้ใช้ให้ที่ Supabase Dashboard';
+    if (m.includes('provider is not enabled')) return 'ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google ใน Supabase (Authentication → Providers)';
     return msg;
   }
 
@@ -292,8 +341,8 @@ window.Store = (function () {
   return {
     state, TABLES, uid,
     init, loadAll, create, update, remove,
-    readSession, signIn, signInWithLink, resetPassword, signOut, onAuthChange,
-    testConnection, switchMode, resetLocal, exportJson, importJson, loadConfig,
+    readSession, signIn, signInWithLink, signInWithGoogle, resetPassword, signOut, onAuthChange,
+    publishNow, testConnection, switchMode, resetLocal, exportJson, importJson, loadConfig,
     get db() { return state.db; },
   };
 })();

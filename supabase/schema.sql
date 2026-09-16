@@ -164,3 +164,51 @@ begin
       t || '_touch', t);
   end loop;
 end $$;
+
+-- ============================================================
+-- โทเคนสำหรับโพสต์ผ่าน API (Facebook / Instagram / LINE ฯลฯ)
+-- ============================================================
+-- ตารางนี้ "ไม่มี policy" โดยตั้งใจ — เปิด RLS ไว้แต่ไม่สร้าง policy ใด ๆ
+-- ผลคือหน้าเว็บ (anon/authenticated) อ่านไม่ได้เลยแม้แต่แถวเดียว
+-- มีเพียง service_role (ที่อยู่ใน Edge Function ฝั่งเซิร์ฟเวอร์) เท่านั้นที่เข้าถึงได้
+create table if not exists public.channel_credentials (
+  id          uuid primary key default gen_random_uuid(),
+  channel_id  uuid references public.channels(id) on delete cascade,
+  platform    text not null,                 -- facebook | instagram | line
+  external_id text not null,                 -- Page ID / IG User ID / LINE channel id
+  access_token text not null,
+  expires_at  timestamptz,                   -- page token แบบไม่หมดอายุให้เว้นว่าง
+  note        text default '',
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+alter table public.channel_credentials enable row level security;
+-- ไม่สร้าง policy โดยเจตนา = หน้าเว็บอ่านไม่ได้
+
+drop trigger if exists channel_credentials_touch on public.channel_credentials;
+create trigger channel_credentials_touch before update on public.channel_credentials
+  for each row execute function public.touch_updated_at();
+
+-- เก็บผลการยิง API ไว้ตรวจย้อนหลัง (โพสต์สำเร็จ/ล้มเหลว เพราะอะไร)
+create table if not exists public.publish_results (
+  id           uuid primary key default gen_random_uuid(),
+  content_id   uuid references public.contents(id) on delete cascade,
+  channel_id   uuid references public.channels(id) on delete set null,
+  platform     text default '',
+  ok           boolean default false,
+  external_post_id text default '',
+  error        text default '',
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+
+alter table public.publish_results enable row level security;
+drop policy if exists publish_results_read on public.publish_results;
+create policy publish_results_read on public.publish_results
+  for select to authenticated using (true);
+-- เขียนได้เฉพาะ service_role (Edge Function) เท่านั้น
+
+drop trigger if exists publish_results_touch on public.publish_results;
+create trigger publish_results_touch before update on public.publish_results
+  for each row execute function public.touch_updated_at();
