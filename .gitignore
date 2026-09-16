@@ -1,0 +1,13 @@
+# ความลับ — ห้าม commit
+.env
+.env.local
+*.key
+
+# ชุดเครื่องมือตัดต่อ ii23 edit kit (สินค้ามีลิขสิทธิ์ ซื้อมาใช้ในเครื่อง ไม่ควรอยู่ใน repo)
+ii23-edit-kit*/
+*.zip
+
+# ระบบปฏิบัติการ / เครื่องมือ
+.DS_Store
+node_modules/
+.vercel

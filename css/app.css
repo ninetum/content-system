@@ -1,0 +1,158 @@
+/* ===== Design tokens (dark-first) =====================================
+   ค่าสีชุดกราฟผ่านการตรวจ CVD/contrast บนพื้นหลัง #141d2e แล้ว
+   (categorical 3 สล็อต: blue / orange / aqua)
+   ==================================================================== */
+:root {
+  color-scheme: dark;
+
+  --page:        #0b1220;
+  --surface-1:   #141d2e;
+  --surface-2:   #1b2639;
+  --surface-3:   #22304a;
+  --line:        rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text-1: #f1f5f9;
+  --text-2: #b6c2d4;
+  --muted:  #8494ab;
+
+  --accent:      #3987e5;
+  --accent-soft: rgba(57, 135, 229, 0.16);
+
+  /* ชุดสีกราฟ */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --grid:     rgba(255, 255, 255, 0.06);
+
+  /* สีสถานะ (สงวนไว้เฉพาะสถานะ ห้ามเอาไปใช้เป็นสีชุดข้อมูล) */
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+}
+
+html, body { background: var(--page); color: var(--text-1); }
+body {
+  font-family: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+[x-cloak] { display: none !important; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 99px; border: 2px solid var(--page); }
+::-webkit-scrollbar-thumb:hover { background: #2e4066; }
+
+/* ===== Surfaces ===== */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.card-2 { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+
+/* ===== Form controls ===== */
+.field {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  color: var(--text-1);
+  font-size: 0.875rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field::placeholder { color: var(--muted); }
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field:disabled { opacity: .5; cursor: not-allowed; }
+textarea.field { line-height: 1.7; resize: vertical; }
+select.field option { background: var(--surface-2); }
+.label { display: block; font-size: .78rem; color: var(--text-2); margin-bottom: .35rem; font-weight: 500; }
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+  padding: .5rem .9rem; border-radius: 10px; font-size: .85rem; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer; transition: background .15s, border-color .15s, opacity .15s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #2a78d6; }
+.btn-ghost { background: var(--surface-2); color: var(--text-1); border-color: var(--line); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-3); }
+.btn-danger { background: rgba(208, 59, 59, .14); color: #f0a3a3; border-color: rgba(208, 59, 59, .35); }
+.btn-danger:hover:not(:disabled) { background: rgba(208, 59, 59, .24); }
+.btn-sm { padding: .3rem .6rem; font-size: .78rem; border-radius: 8px; }
+
+/* ===== Badges / สถานะ (สี + ไอคอน + ข้อความเสมอ) ===== */
+.badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .15rem .55rem; border-radius: 99px;
+  font-size: .72rem; font-weight: 600; line-height: 1.6;
+  border: 1px solid transparent;
+}
+.badge-draft     { background: rgba(132,148,171,.14); color: #c3cfdf; border-color: rgba(132,148,171,.3); }
+.badge-pending   { background: rgba(250,178,25,.14);  color: #f3c766; border-color: rgba(250,178,25,.35); }
+.badge-approved  { background: rgba(57,135,229,.14);  color: #8fbdf2; border-color: rgba(57,135,229,.35); }
+.badge-scheduled { background: rgba(25,158,112,.14);  color: #6fd3ae; border-color: rgba(25,158,112,.35); }
+.badge-published { background: rgba(12,163,12,.16);   color: #74d174; border-color: rgba(12,163,12,.35); }
+.badge-rejected  { background: rgba(208,59,59,.14);   color: #f0a3a3; border-color: rgba(208,59,59,.35); }
+
+/* ===== Nav ===== */
+.nav-item {
+  display: flex; align-items: center; gap: .7rem;
+  width: 100%; padding: .55rem .75rem; border-radius: 10px;
+  font-size: .875rem; color: var(--text-2); text-align: left;
+  cursor: pointer; transition: background .12s, color .12s;
+}
+.nav-item:hover { background: var(--surface-2); color: var(--text-1); }
+.nav-item.active { background: var(--accent); color: #fff; font-weight: 600; }
+.nav-section {
+  padding: 1rem .75rem .35rem;
+  font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+
+/* ===== Charts =====
+   แท่งเดี่ยวสีเดียว (magnitude) ปลายแท่งโค้ง 4px ติดเส้นฐาน
+   มีป้ายตัวเลขกำกับตรง ๆ จึงไม่ต้องใช้ legend
+   ==================================================================== */
+.bar-track { background: var(--grid); border-radius: 4px; height: 10px; overflow: hidden; }
+.bar-fill  { height: 100%; border-radius: 4px; background: var(--series-1); transition: width .4s ease; }
+.bar-row:hover .bar-fill { filter: brightness(1.18); }
+
+.col-chart { display: flex; align-items: flex-end; gap: 6px; height: 132px; }
+.col-wrap  { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.col-fill  { background: var(--series-1); border-radius: 4px 4px 0 0; min-height: 3px; transition: height .4s ease; }
+.col-wrap:hover .col-fill { filter: brightness(1.18); }
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* ===== Calendar ===== */
+.cal-cell { min-height: 104px; background: var(--surface-1); border: 1px solid var(--line); border-radius: 10px; padding: .4rem; }
+.cal-cell.dim { opacity: .38; }
+.cal-cell.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+/* ===== Toast ===== */
+.toast {
+  display: flex; align-items: flex-start; gap: .6rem;
+  background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: 12px; padding: .7rem .9rem; font-size: .85rem;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45); min-width: 260px; max-width: 380px;
+}
+.toast.ok   { border-left: 3px solid var(--good); }
+.toast.warn { border-left: 3px solid var(--warning); }
+.toast.err  { border-left: 3px solid var(--critical); }
+
+/* ===== Misc ===== */
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hairline { border-top: 1px solid var(--line); }
