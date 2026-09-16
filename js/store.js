@@ -77,7 +77,13 @@ window.Store = (function () {
 
   /* ---------- config ---------- */
   function loadConfig() {
-    let cfg = { mode: 'local', url: CFG.supabaseUrl || '', key: CFG.supabaseAnonKey || '' };
+    // มีค่าฝังไว้ในโค้ด = ใช้ฐานข้อมูลจริงตั้งแต่เปิดหน้าแรก (ผู้ใช้ยังสลับเป็นโหมดทดลองได้)
+    const preset = CFG.supabaseUrl && CFG.supabaseAnonKey;
+    let cfg = {
+      mode: preset ? 'supabase' : 'local',
+      url: CFG.supabaseUrl || '',
+      key: CFG.supabaseAnonKey || '',
+    };
     try {
       const raw = localStorage.getItem(CFG.configKey);
       if (raw) cfg = { ...cfg, ...JSON.parse(raw) };

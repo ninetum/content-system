@@ -12,9 +12,10 @@ window.CMS_CONFIG = {
   storageKey: 'cms.db.v1',
   configKey: 'cms.config.v1',
 
-  // ถ้าต้องการ hard-code ค่าไว้เลย ให้ใส่ตรงนี้ (ไม่ใส่ก็ตั้งค่าผ่านหน้าเว็บได้)
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  // โปรเจกต์จริงของระบบนี้ — anon key ออกแบบมาให้เปิดเผยได้ ความปลอดภัยอยู่ที่ RLS
+  // (ห้ามเอา service_role key มาใส่ตรงนี้เด็ดขาด)
+  supabaseUrl: 'https://oxfonqvrquqmazzhmlnf.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94Zm9ucXZycXVxbWF6emhtbG5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDA1MzcsImV4cCI6MjEwNTExNjUzN30.fJ1eJHUpaKN1Aqf0Mf6IVCEbzj1Cybl1xaU0SoojJwQ',
 
   platforms: [
     { id: 'facebook',  name: 'Facebook',  icon: '📘', color: '#3987e5' },

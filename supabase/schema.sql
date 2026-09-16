@@ -147,7 +147,9 @@ end $$;
 -- อัปเดต updated_at อัตโนมัติ
 -- ============================================================
 create or replace function public.touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = ''          -- ล็อก search_path กันการสวม schema (ตาม security linter ของ Supabase)
+as $$
 begin
   new.updated_at = now();
   return new;
