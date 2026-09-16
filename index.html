@@ -163,6 +163,14 @@
         </template>
       </button>
 
+      <div class="nav-section">ขาย &amp; รายได้</div>
+      <button class="nav-item" :class="view==='money' && 'active'" @click="go('money')">
+        <span>💰</span><span>สินค้า &amp; รายได้</span>
+        <template x-if="db.products.length">
+          <span class="ml-auto text-[11px] num" style="color:var(--muted)" x-text="db.products.length"></span>
+        </template>
+      </button>
+
       <div class="nav-section">วัดผล</div>
       <button class="nav-item" :class="view==='reports' && 'active'" @click="go('reports')">
         <span>📊</span><span>รายงานแสดงผล</span>
@@ -196,7 +204,7 @@
         <h1 class="font-bold text-base lg:text-lg truncate" x-text="{
           dashboard:'ภาพรวม', channels:'เพจ & ช่อง', contents:'คอนเทนต์ทั้งหมด', editor:'สร้าง / แก้ไขคอนเทนต์',
           gallery:'แกลลอรี่', styles:'คลังสไตล์', queue:'คิวโพสต์', approvals:'รออนุมัติ',
-          editjobs:'โรงตัดคลิป', reports:'รายงานแสดงผล', settings:'ตั้งค่าระบบ'}[view]"></h1>
+          editjobs:'โรงตัดคลิป', money:'สินค้า & รายได้', reports:'รายงานแสดงผล', settings:'ตั้งค่าระบบ'}[view]"></h1>
       </div>
       <div class="ml-auto flex items-center gap-2">
         <template x-if="session">
@@ -231,6 +239,28 @@
             <div class="text-[11px] mt-0.5" style="color:var(--muted)" x-text="k.s"></div>
           </div>
         </template>
+      </div>
+
+      <div class="card p-4" x-show="moneyTotals.revenue > 0">
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div>
+            <div class="text-xs" style="color:var(--text-2)">💰 รายได้จากคอนเทนต์</div>
+            <div class="text-3xl font-bold num mt-1" x-text="fmtBaht(moneyTotals.revenue)"></div>
+          </div>
+          <div>
+            <div class="text-xs" style="color:var(--text-2)">กำไรสุทธิ</div>
+            <div class="text-xl font-semibold num mt-1" style="color:var(--good)" x-text="fmtBaht(moneyTotals.profit)"></div>
+          </div>
+          <div>
+            <div class="text-xs" style="color:var(--text-2)">รายได้ต่อ 1,000 วิว</div>
+            <div class="text-xl font-semibold num mt-1" x-text="fmtBaht(moneyTotals.rpm)"></div>
+          </div>
+          <div x-show="moneyTotals.ads > 0">
+            <div class="text-xs" style="color:var(--text-2)">ROAS (รายได้ ÷ ค่าแอด)</div>
+            <div class="text-xl font-semibold num mt-1" x-text="moneyTotals.roas + 'x'"></div>
+          </div>
+          <button class="btn btn-ghost btn-sm ml-auto" @click="go('money')">ดูรายละเอียด →</button>
+        </div>
       </div>
 
       <div class="grid lg:grid-cols-3 gap-3">
@@ -626,6 +656,69 @@
             <p x-show="!db.media.length" class="text-xs text-center py-4" style="color:var(--muted)">
               ยังไม่มีไฟล์ในแกลลอรี่
             </p>
+          </div>
+
+          <div class="card p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-sm">💰 สินค้าที่โพสต์นี้ขาย</h3>
+              <button class="text-xs" style="color:var(--accent)" @click="go('money')">จัดการสินค้า →</button>
+            </div>
+
+            <template x-if="!db.products.length">
+              <p class="text-[11px]" style="color:var(--muted)">
+                ยังไม่มีสินค้าในระบบ — เพิ่มที่หน้า “สินค้า &amp; รายได้” ก่อน แล้วจะผูกกับโพสต์ได้
+              </p>
+            </template>
+
+            <div class="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              <template x-for="p in db.products" :key="p.id">
+                <label class="flex items-center gap-2 text-sm card-2 px-2.5 py-1.5 cursor-pointer">
+                  <input type="checkbox" class="w-4 h-4 accent-blue-500"
+                         :checked="(editor.product_ids||[]).includes(p.id)"
+                         @change="toggleIn(editor.product_ids, p.id)">
+                  <span class="truncate flex-1" x-text="p.name"></span>
+                  <span class="text-[11px] num" style="color:var(--muted)" x-text="fmtBaht(p.price)"></span>
+                </label>
+              </template>
+            </div>
+
+            <div class="hairline pt-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <h4 class="text-xs font-semibold">🔗 ลิงก์ติดตามผล</h4>
+                <span class="text-[10px]" style="color:var(--muted)">แยกตามช่อง</span>
+              </div>
+              <p class="text-[11px] mb-2" style="color:var(--muted)">
+                แปะลิงก์นี้ในโพสต์แทนลิงก์ตรง จะได้รู้ว่ายอดคลิกและยอดขายมาจากช่องไหน
+              </p>
+
+              <template x-if="editor.id">
+                <div class="space-y-2">
+                  <template x-for="l in linksOf(editor.id)" :key="l.id">
+                    <div class="card-2 p-2">
+                      <div class="flex items-center gap-2 text-[11px]">
+                        <span class="truncate flex-1" style="color:var(--text-2)" x-text="l.label || 'ลิงก์'"></span>
+                        <span class="num font-semibold" x-text="clicksOf(l.id) + ' คลิก'"></span>
+                      </div>
+                      <div class="flex items-center gap-1 mt-1">
+                        <input class="field text-[11px] py-1" readonly :value="fullLink(l.code)">
+                        <button class="btn btn-ghost btn-sm" @click="copyText(fullLink(l.code), 'คัดลอกลิงก์แล้ว')">คัดลอก</button>
+                        <button class="btn btn-danger btn-sm" @click="deleteLink(l)">✕</button>
+                      </div>
+                    </div>
+                  </template>
+
+                  <input class="field text-xs" x-model="linkTarget"
+                         placeholder="ปลายทาง (เว้นว่างได้ถ้าเลือกสินค้าที่มีลิงก์แล้ว)">
+                  <button class="btn btn-ghost w-full btn-sm" @click="makeLinks(contentById(editor.id) || editor)">
+                    ✚ สร้างลิงก์ให้ทุกช่องที่เลือกไว้
+                  </button>
+                </div>
+              </template>
+
+              <p x-show="!editor.id" class="text-[11px]" style="color:var(--warning)">
+                บันทึกคอนเทนต์ก่อน แล้วปุ่มสร้างลิงก์จะใช้งานได้
+              </p>
+            </div>
           </div>
 
           <div class="card p-4" x-show="editorStyle">
@@ -1046,6 +1139,221 @@
       </div>
     </section>
 
+    <!-- ==================== สินค้า & รายได้ ==================== -->
+    <section x-show="view==='money'" class="space-y-5">
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <template x-for="k in [
+          {t:'รายได้รวม', v:fmtBaht(moneyTotals.revenue), s:'จากคอนเทนต์ทั้งหมด', i:'💰'},
+          {t:'กำไรสุทธิ', v:fmtBaht(moneyTotals.profit), s:'หักต้นทุนและค่าแอดแล้ว', i:'📈'},
+          {t:'จำนวนออร์เดอร์', v:fmtNum(moneyTotals.orders), s:'รายการที่บันทึกไว้', i:'🧾'},
+          {t:'รายได้ต่อ 1,000 วิว', v:fmtBaht(moneyTotals.rpm), s:'ยิ่งสูง คอนเทนต์ยิ่งคุ้ม', i:'🎯'}]" :key="k.t">
+          <div class="card p-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs" style="color:var(--text-2)" x-text="k.t"></span>
+              <span x-text="k.i"></span>
+            </div>
+            <div class="text-2xl font-bold mt-2 num" x-text="k.v"></div>
+            <div class="text-[11px] mt-0.5" style="color:var(--muted)" x-text="k.s"></div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ---------- สินค้า ---------- -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="font-semibold text-sm">สินค้าที่ขาย</h2>
+            <p class="text-[11px]" style="color:var(--muted)">ใส่ลิงก์หน้าสินค้าไว้ ระบบจะเอาไปสร้างลิงก์ติดตามผลให้เอง</p>
+          </div>
+          <button class="btn btn-primary btn-sm" @click="newProduct()">✚ เพิ่มสินค้า</button>
+        </div>
+
+        <template x-if="productForm">
+        <div class="card p-4 space-y-3">
+          <div class="grid md:grid-cols-2 gap-3">
+            <div class="md:col-span-2"><label class="label">ชื่อสินค้า</label>
+              <input class="field" x-model="productForm.name" placeholder="เช่น กล่องท้ายรถ 45 ลิตร"></div>
+            <div><label class="label">รหัสสินค้า (SKU)</label><input class="field" x-model="productForm.sku"></div>
+            <div><label class="label">ลิงก์หน้าสินค้า</label>
+              <input class="field" x-model="productForm.url" placeholder="https://…"></div>
+            <div><label class="label">ราคาขาย (บาท)</label>
+              <input type="number" class="field num" x-model="productForm.price"></div>
+            <div><label class="label">ต้นทุน (บาท)</label>
+              <input type="number" class="field num" x-model="productForm.cost"></div>
+            <div class="md:col-span-2"><label class="label">โน้ต</label><input class="field" x-model="productForm.note"></div>
+          </div>
+          <div class="text-xs" style="color:var(--text-2)"
+               x-text="`กำไรต่อชิ้น ${fmtBaht(margin(productForm).baht)} (${margin(productForm).pct}%)`"></div>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="w-4 h-4 accent-blue-500" x-model="productForm.active">
+            <span>ยังขายอยู่</span>
+          </label>
+          <div class="flex gap-2">
+            <button class="btn btn-primary" @click="saveProduct()">บันทึก</button>
+            <button class="btn btn-ghost" @click="productForm=null">ยกเลิก</button>
+          </div>
+        </div>
+        </template>
+
+        <template x-if="!db.products.length">
+          <div class="card p-8 text-center" style="color:var(--muted)">
+            <div class="text-3xl mb-2">💰</div>
+            <p class="text-sm">ยังไม่มีสินค้า — เพิ่มสินค้าก่อน แล้วค่อยผูกกับคอนเทนต์</p>
+          </div>
+        </template>
+
+        <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <template x-for="p in db.products" :key="p.id">
+            <div class="card p-4">
+              <div class="flex items-start gap-2">
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-semibold text-sm truncate" x-text="p.name"></h3>
+                  <p class="text-[11px]" style="color:var(--muted)" x-text="p.sku || '—'"></p>
+                </div>
+                <span class="badge shrink-0" :class="p.active ? 'badge-published' : 'badge-draft'">
+                  <span x-text="p.active ? '✅' : '⏸️'"></span>
+                  <span x-text="p.active ? 'ขายอยู่' : 'พัก'"></span>
+                </span>
+              </div>
+              <div class="flex items-baseline gap-2 mt-2">
+                <span class="text-xl font-bold num" x-text="fmtBaht(p.price)"></span>
+                <span class="text-[11px] num" style="color:var(--good)"
+                      x-text="`กำไร ${fmtBaht(margin(p).baht)} (${margin(p).pct}%)`"></span>
+              </div>
+              <div class="flex gap-2 mt-3">
+                <button class="btn btn-ghost btn-sm" @click="editProduct(p)">แก้ไข</button>
+                <a x-show="p.url" class="btn btn-ghost btn-sm" :href="p.url" target="_blank" rel="noopener">เปิดหน้าสินค้า</a>
+                <button class="btn btn-danger btn-sm ml-auto" @click="deleteProduct(p)">ลบ</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ---------- ยอดขาย ---------- -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="font-semibold text-sm">ยอดขายที่เกิดจากคอนเทนต์</h2>
+            <p class="text-[11px]" style="color:var(--muted)">บันทึกทุกครั้งที่ปิดการขายได้ แล้วระบบจะบอกเองว่าโพสต์ไหนทำเงิน</p>
+          </div>
+          <button class="btn btn-primary btn-sm" @click="newSale()">✚ บันทึกยอดขาย</button>
+        </div>
+
+        <template x-if="saleForm">
+        <div class="card-2 p-3 mb-3 grid md:grid-cols-3 gap-2">
+          <div class="md:col-span-2"><label class="label">มาจากคอนเทนต์</label>
+            <select class="field" x-model="saleForm.content_id">
+              <template x-for="c in db.contents" :key="c.id"><option :value="c.id" x-text="c.title"></option></template>
+            </select></div>
+          <div><label class="label">ช่อง</label>
+            <select class="field" x-model="saleForm.channel_id">
+              <option value="">— ไม่ระบุ —</option>
+              <template x-for="c in db.channels" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+            </select></div>
+          <div><label class="label">สินค้า</label>
+            <select class="field" x-model="saleForm.product_id" @change="fillSaleAmounts()">
+              <option value="">— ไม่ระบุ —</option>
+              <template x-for="p in db.products" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+            </select></div>
+          <div><label class="label">จำนวน</label>
+            <input type="number" class="field num" x-model="saleForm.qty" @change="fillSaleAmounts()"></div>
+          <div><label class="label">ยอดขาย (บาท)</label>
+            <input type="number" class="field num" x-model="saleForm.amount"></div>
+          <div><label class="label">ต้นทุนรวม (บาท)</label>
+            <input type="number" class="field num" x-model="saleForm.cost_amount"></div>
+          <div><label class="label">ค่าแอดที่ลงไป (บาท)</label>
+            <input type="number" class="field num" x-model="saleForm.ad_spend"></div>
+          <div class="md:col-span-3 flex items-end gap-2">
+            <button class="btn btn-primary" @click="saveSale()">บันทึก</button>
+            <button class="btn btn-ghost" @click="saleForm=null">ยกเลิก</button>
+          </div>
+        </div>
+        </template>
+
+        <template x-if="!db.sales.length">
+          <p class="text-sm py-6 text-center" style="color:var(--muted)">ยังไม่มียอดขายที่บันทึกไว้</p>
+        </template>
+
+        <div x-show="db.sales.length" class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs" style="color:var(--muted)">
+                <th class="text-left font-medium py-2">วันที่</th>
+                <th class="text-left font-medium py-2">คอนเทนต์ / สินค้า</th>
+                <th class="text-right font-medium py-2">ยอดขาย</th>
+                <th class="text-right font-medium py-2">กำไร</th>
+                <th class="py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="s in [...db.sales].sort((a,b)=>new Date(b.sold_at)-new Date(a.sold_at))" :key="s.id">
+                <tr class="hairline">
+                  <td class="py-2 text-[11px] num" style="color:var(--muted)" x-text="fmtDate(s.sold_at, false)"></td>
+                  <td class="py-2 pr-3">
+                    <div class="truncate max-w-[280px]" x-text="contentById(s.content_id)?.title || '—'"></div>
+                    <div class="text-[11px]" style="color:var(--muted)"
+                         x-text="(productById(s.product_id)?.name || 'ไม่ระบุสินค้า') + ' × ' + s.qty"></div>
+                  </td>
+                  <td class="py-2 text-right num" x-text="fmtBaht(s.amount)"></td>
+                  <td class="py-2 text-right num" style="color:var(--good)"
+                      x-text="fmtBaht((Number(s.amount)||0)-(Number(s.cost_amount)||0)-(Number(s.ad_spend)||0))"></td>
+                  <td class="py-2 text-right">
+                    <button class="btn btn-danger btn-sm" @click="deleteSale(s)">ลบ</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ---------- อันดับ ---------- -->
+      <div class="grid lg:grid-cols-2 gap-3">
+        <div class="card p-4">
+          <h2 class="font-semibold text-sm mb-1">คอนเทนต์ที่ทำเงินที่สุด</h2>
+          <p class="text-[11px] mb-3" style="color:var(--muted)">หน่วย: บาท</p>
+          <template x-if="!revenueRanking.length">
+            <p class="text-sm py-4 text-center" style="color:var(--muted)">ยังไม่มีข้อมูล</p>
+          </template>
+          <div class="space-y-2.5">
+            <template x-for="r in revenueRanking.slice(0,8)" :key="r.content.id">
+              <div class="bar-row">
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="truncate pr-3" style="color:var(--text-2)" x-text="r.content.title"></span>
+                  <span class="num font-semibold" x-text="fmtBaht(r.revenue)"></span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
+                <div class="text-[10px] mt-1 num" style="color:var(--muted)"
+                     x-text="`${fmtNum(r.clicks)} คลิก · ${r.orders} ออร์เดอร์ · ${fmtBaht(r.rpm)}/1,000 วิว`"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <h2 class="font-semibold text-sm mb-1">สินค้าขายดี</h2>
+          <p class="text-[11px] mb-3" style="color:var(--muted)">หน่วย: บาท</p>
+          <template x-if="!productRanking.length">
+            <p class="text-sm py-4 text-center" style="color:var(--muted)">ยังไม่มีข้อมูล</p>
+          </template>
+          <div class="space-y-2.5">
+            <template x-for="r in productRanking" :key="r.product.id">
+              <div class="bar-row">
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="truncate pr-3" style="color:var(--text-2)" x-text="r.product.name"></span>
+                  <span class="num font-semibold" x-text="fmtBaht(r.revenue)"></span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
+                <div class="text-[10px] mt-1 num" style="color:var(--muted)" x-text="`ขายได้ ${r.qty} ชิ้น`"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ==================== รายงานแสดงผล ==================== -->
     <section x-show="view==='reports'" class="space-y-4">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1077,6 +1385,24 @@
                     <span x-text="platform(r.platform).icon"></span><span x-text="r.name"></span>
                   </span>
                   <span class="num font-semibold" x-text="fmtNum(r.views)"></span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="card p-4" x-show="revenueByPillar.length">
+          <h2 class="font-semibold text-sm mb-1">รายได้ตามประเภทคอนเทนต์</h2>
+          <p class="text-[11px] mb-3" style="color:var(--muted)">
+            หน่วย: บาท — ตัวเลขนี้สำคัญกว่ายอดวิว เพราะบอกว่าควรลงแรงกับคอนเทนต์แบบไหนต่อ
+          </p>
+          <div class="space-y-2.5">
+            <template x-for="r in revenueByPillar" :key="r.name">
+              <div class="bar-row">
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="truncate pr-3" style="color:var(--text-2)" x-text="r.name"></span>
+                  <span class="num font-semibold" x-text="fmtBaht(r.revenue)"></span>
                 </div>
                 <div class="bar-track"><div class="bar-fill" :style="`width:${r.pct}%`"></div></div>
               </div>
@@ -1144,6 +1470,8 @@
                 <th class="text-right font-medium py-2">ยอดวิว</th>
                 <th class="text-right font-medium py-2">ปฏิสัมพันธ์</th>
                 <th class="text-right font-medium py-2">อัตรา</th>
+                <th class="text-right font-medium py-2">คลิก</th>
+                <th class="text-right font-medium py-2">รายได้</th>
               </tr>
             </thead>
             <tbody>
@@ -1156,6 +1484,8 @@
                   <td class="py-2 text-right num" x-text="fmtNum(r.views)"></td>
                   <td class="py-2 text-right num" x-text="fmtNum(r.engage)"></td>
                   <td class="py-2 text-right num" x-text="r.rate + '%'"></td>
+                  <td class="py-2 text-right num" x-text="fmtNum(money(r.content.id).clicks)"></td>
+                  <td class="py-2 text-right num font-semibold" x-text="fmtBaht(money(r.content.id).revenue)"></td>
                 </tr>
               </template>
             </tbody>

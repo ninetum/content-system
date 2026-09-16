@@ -13,6 +13,10 @@ window.Store = (function () {
     stats:     'content_stats',
     activity:  'activity_log',
     editJobs:  'edit_jobs',
+    products:  'products',
+    links:     'tracked_links',
+    clicks:    'link_clicks',
+    sales:     'sales',
   };
 
   const uid = (p) => `${p}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
@@ -48,7 +52,10 @@ window.Store = (function () {
   }
 
   function emptyDb() {
-    return { channels: [], styles: [], media: [], contents: [], stats: [], activity: [], editJobs: [] };
+    return {
+      channels: [], styles: [], media: [], contents: [], stats: [], activity: [],
+      editJobs: [], products: [], links: [], clicks: [], sales: [],
+    };
   }
 
   function seedDb() {
@@ -61,6 +68,10 @@ window.Store = (function () {
       stats:    s.stats.map((x) => ({ ...x })),
       activity: s.activity.map((x) => ({ ...x })),
       editJobs: [],
+      products: (s.products || []).map((x) => ({ ...x })),
+      links:    [],
+      clicks:   (s.clicks || []).map((x) => ({ ...x })),
+      sales:    (s.sales || []).map((x) => ({ ...x })),
     };
   }
 
@@ -152,6 +163,38 @@ window.Store = (function () {
     }
     state.db[name] = state.db[name].filter((r) => r.id !== id);
     writeLocal();
+  }
+
+  /* ---------- ลิงก์ติดตามผล ---------- */
+  function newCode() {
+    // 6 ตัว พอสำหรับหลักล้านลิงก์ และสั้นพอที่จะพิมพ์ตามได้
+    const chars = 'abcdefghijkmnpqrstuvwxyz23456789';   // ตัดตัวที่สับสน (l, o, 0, 1)
+    let out = '';
+    for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+
+  async function createLink({ content_id, channel_id, product_id, target_url, label }) {
+    if (!target_url) throw new Error('ยังไม่มีปลายทางของลิงก์ (ใส่ลิงก์สินค้าหรือหน้าร้านก่อน)');
+
+    let code = newCode();
+    for (let i = 0; i < 5; i++) {
+      if (!state.db.links.some((l) => l.code === code)) break;
+      code = newCode();
+    }
+
+    return create('links', {
+      code, content_id: content_id || null, channel_id: channel_id || null,
+      product_id: product_id || null, target_url, label: label || '',
+    });
+  }
+
+  // ที่อยู่เต็มของลิงก์ที่เอาไปแปะในโพสต์
+  function linkUrl(code) {
+    if (state.mode === 'supabase' && state.url) {
+      return `${state.url.replace(/\/$/, '')}/functions/v1/r/${code}`;
+    }
+    return `${window.location.origin}/r/${code}`;   // โหมดทดลอง — ไว้ดูหน้าตาเฉย ๆ
   }
 
   /* ---------- โพสต์จริงผ่าน Edge Function ----------
@@ -342,7 +385,7 @@ window.Store = (function () {
     state, TABLES, uid,
     init, loadAll, create, update, remove,
     readSession, signIn, signInWithLink, signInWithGoogle, resetPassword, signOut, onAuthChange,
-    publishNow, testConnection, switchMode, resetLocal, exportJson, importJson, loadConfig,
+    createLink, linkUrl, publishNow, testConnection, switchMode, resetLocal, exportJson, importJson, loadConfig,
     get db() { return state.db; },
   };
 })();

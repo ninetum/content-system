@@ -11,7 +11,10 @@ function cmsApp() {
     sidebarOpen: false,
     toasts: [],
     cfg: CFG,
-    db: { channels: [], styles: [], media: [], contents: [], stats: [], activity: [], editJobs: [] },
+    db: {
+      channels: [], styles: [], media: [], contents: [], stats: [], activity: [],
+      editJobs: [], products: [], links: [], clicks: [], sales: [],
+    },
     mode: 'local',
 
     // ระบบล็อกอิน (ใช้เฉพาะโหมด supabase)
@@ -20,6 +23,9 @@ function cmsApp() {
     authBusy: false,
     login: { email: '', password: '', mode: 'password' },   // password | link
     publishing: '',                                          // id ของคอนเทนต์ที่กำลังยิง API
+    productForm: null,
+    saleForm: null,
+    linkTarget: '',                                          // ปลายทางของลิงก์ที่กำลังจะสร้าง
 
     // ตัวกรอง
     search: '',
@@ -54,6 +60,10 @@ function cmsApp() {
         stats:    [...(d.stats || [])],
         activity: [...(d.activity || [])],
         editJobs: [...(d.editJobs || [])],
+        products: [...(d.products || [])],
+        links:    [...(d.links || [])],
+        clicks:   [...(d.clicks || [])],
+        sales:    [...(d.sales || [])],
       };
     },
 
@@ -235,6 +245,203 @@ function cmsApp() {
       }
     },
 
+    productById(id) { return this.db.products.find((p) => p.id === id); },
+
+    fmtBaht(n) {
+      const v = Number(n) || 0;
+      return v.toLocaleString('th-TH', { maximumFractionDigits: 0 }) + ' ฿';
+    },
+
+    /* ---------- สินค้า ---------- */
+    newProduct() {
+      this.productForm = { id: null, name: '', sku: '', price: 0, cost: 0, url: '', image_url: '', active: true, note: '' };
+    },
+    editProduct(p) { this.productForm = { ...p }; },
+    async saveProduct() {
+      const f = this.productForm;
+      if (!f.name.trim()) { this.toast('ใส่ชื่อสินค้าก่อนครับ', 'warn'); return; }
+      await this.run(async () => {
+        const payload = {
+          name: f.name.trim(), sku: f.sku.trim(), price: Number(f.price) || 0,
+          cost: Number(f.cost) || 0, url: f.url.trim(), image_url: f.image_url.trim(),
+          active: !!f.active, note: f.note || '',
+        };
+        if (f.id) await Store.update('products', f.id, payload);
+        else await Store.create('products', payload);
+        this.refresh();
+        this.productForm = null;
+      }, 'บันทึกสินค้าแล้ว');
+    },
+    async deleteProduct(p) {
+      if (!confirm(`ลบสินค้า "${p.name}" ไหมครับ? (ยอดขายที่บันทึกไว้จะยังอยู่)`)) return;
+      await this.run(async () => {
+        await Store.remove('products', p.id);
+        this.refresh();
+      }, 'ลบสินค้าแล้ว');
+    },
+
+    // กำไรต่อชิ้น ใช้เตือนเวลาตั้งราคาพลาด
+    margin(p) {
+      const price = Number(p.price) || 0;
+      const cost = Number(p.cost) || 0;
+      return { baht: price - cost, pct: price ? (((price - cost) / price) * 100).toFixed(0) : '0' };
+    },
+
+    /* ---------- ยอดขาย ---------- */
+    newSale(content = null) {
+      const first = content?.product_ids?.[0] || this.db.products[0]?.id || '';
+      const p = this.productById(first);
+      this.saleForm = {
+        content_id: content?.id || this.db.contents[0]?.id || '',
+        channel_id: content?.channel_ids?.[0] || this.db.channels[0]?.id || '',
+        product_id: first, qty: 1,
+        amount: p ? Number(p.price) || 0 : 0,
+        cost_amount: p ? Number(p.cost) || 0 : 0,
+        ad_spend: 0, note: '',
+      };
+    },
+    // เลือกสินค้า/จำนวนแล้วเติมยอดให้อัตโนมัติ จะได้ไม่ต้องคิดเลขเอง
+    fillSaleAmounts() {
+      const p = this.productById(this.saleForm?.product_id);
+      if (!p) return;
+      const qty = Number(this.saleForm.qty) || 1;
+      this.saleForm.amount = (Number(p.price) || 0) * qty;
+      this.saleForm.cost_amount = (Number(p.cost) || 0) * qty;
+    },
+    async saveSale() {
+      const f = this.saleForm;
+      if (!f.content_id) { this.toast('เลือกคอนเทนต์ที่ทำให้เกิดยอดขายนี้ครับ', 'warn'); return; }
+      if (!(Number(f.amount) > 0)) { this.toast('ยอดขายต้องมากกว่า 0', 'warn'); return; }
+      await this.run(async () => {
+        await Store.create('sales', {
+          content_id: f.content_id, channel_id: f.channel_id || null, product_id: f.product_id || null,
+          qty: Number(f.qty) || 1, amount: Number(f.amount) || 0,
+          cost_amount: Number(f.cost_amount) || 0, ad_spend: Number(f.ad_spend) || 0,
+          source: 'กรอกเอง', note: f.note || '', sold_at: new Date().toISOString(),
+        });
+        this.refresh();
+        this.saleForm = null;
+      }, 'บันทึกยอดขายแล้ว');
+    },
+    async deleteSale(s) {
+      if (!confirm('ลบรายการขายนี้ไหมครับ?')) return;
+      await this.run(async () => {
+        await Store.remove('sales', s.id);
+        this.refresh();
+      }, 'ลบรายการขายแล้ว');
+    },
+
+    /* ---------- ลิงก์ติดตามผล ---------- */
+    linksOf(contentId) { return this.db.links.filter((l) => l.content_id === contentId); },
+    clicksOf(linkId) { return this.db.clicks.filter((c) => c.link_id === linkId).length; },
+    fullLink(code) { return Store.linkUrl(code); },
+
+    // สร้างลิงก์แยกรายช่อง จะได้รู้ว่าคลิกมาจากช่องไหน
+    async makeLinks(content) {
+      const product = this.productById((content.product_ids || [])[0]);
+      const target = (this.linkTarget || '').trim() || product?.url || '';
+      if (!target) {
+        this.toast('ยังไม่มีปลายทาง — ใส่ลิงก์สินค้าในหน้า "สินค้า & รายได้" หรือพิมพ์ลิงก์ในช่องด้านล่างก่อนครับ', 'warn');
+        return;
+      }
+      const channels = content.channel_ids || [];
+      if (!channels.length) { this.toast('เลือกช่องปลายทางของคอนเทนต์ก่อนครับ', 'warn'); return; }
+
+      await this.run(async () => {
+        for (const chId of channels) {
+          const exists = this.db.links.some((l) => l.content_id === content.id && l.channel_id === chId);
+          if (exists) continue;
+          await Store.createLink({
+            content_id: content.id, channel_id: chId,
+            product_id: product?.id || null, target_url: target,
+            label: this.channelById(chId)?.name || '',
+          });
+        }
+        this.refresh();
+        this.linkTarget = '';
+      }, 'สร้างลิงก์ติดตามผลแล้ว — คัดลอกไปแปะในโพสต์ได้เลย');
+    },
+    async deleteLink(l) {
+      if (!confirm('ลบลิงก์นี้ไหมครับ? สถิติคลิกจะหายไปด้วย')) return;
+      await this.run(async () => {
+        await Store.remove('links', l.id);
+        this.refresh();
+      }, 'ลบลิงก์แล้ว');
+    },
+
+    /* ---------- ตัวเลขเรื่องเงิน ---------- */
+    money(contentId) {
+      const rows = this.db.sales.filter((s) => s.content_id === contentId);
+      const revenue = rows.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+      const cost = rows.reduce((a, b) => a + (Number(b.cost_amount) || 0), 0);
+      const ads = rows.reduce((a, b) => a + (Number(b.ad_spend) || 0), 0);
+      const orders = rows.length;
+      const clicks = this.linksOf(contentId).reduce((a, l) => a + this.clicksOf(l.id), 0);
+      const views = this.db.stats.filter((s) => s.content_id === contentId)
+        .reduce((a, b) => a + (Number(b.views) || 0), 0);
+      return {
+        revenue, cost, ads, orders, clicks, views,
+        profit: revenue - cost - ads,
+        // รายได้ต่อ 1,000 วิว — ตัวเลขที่บอกว่าคอนเทนต์ "คุ้ม" จริงไหม
+        rpm: views ? (revenue / views) * 1000 : 0,
+        cvr: clicks ? ((orders / clicks) * 100).toFixed(1) : '0.0',
+      };
+    },
+
+    get moneyTotals() {
+      const revenue = this.db.sales.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+      const cost = this.db.sales.reduce((a, b) => a + (Number(b.cost_amount) || 0), 0);
+      const ads = this.db.sales.reduce((a, b) => a + (Number(b.ad_spend) || 0), 0);
+      const views = this.db.stats.reduce((a, b) => a + (Number(b.views) || 0), 0);
+      return {
+        revenue, profit: revenue - cost - ads, ads,
+        orders: this.db.sales.length,
+        clicks: this.db.clicks.length,
+        rpm: views ? (revenue / views) * 1000 : 0,
+        roas: ads ? (revenue / ads).toFixed(1) : '—',
+      };
+    },
+
+    // อันดับคอนเทนต์ตามรายได้ — ใช้ตอบว่า "ควรทำคอนเทนต์แบบไหนต่อ"
+    get revenueRanking() {
+      const rows = this.db.contents
+        .map((c) => ({ content: c, ...this.money(c.id) }))
+        .filter((r) => r.revenue > 0 || r.clicks > 0)
+        .sort((a, b) => b.revenue - a.revenue);
+      const max = Math.max(1, ...rows.map((r) => r.revenue));
+      return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
+    },
+
+    // ประเภทคอนเทนต์ไหนทำเงินที่สุด
+    get revenueByPillar() {
+      const map = {};
+      for (const r of this.revenueRanking) {
+        const k = r.content.pillar || 'ไม่ระบุ';
+        map[k] = (map[k] || 0) + r.revenue;
+      }
+      const rows = Object.entries(map).map(([name, revenue]) => ({ name, revenue }))
+        .sort((a, b) => b.revenue - a.revenue);
+      const max = Math.max(1, ...rows.map((r) => r.revenue));
+      return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
+    },
+
+    get productRanking() {
+      const map = {};
+      for (const s of this.db.sales) {
+        if (!s.product_id) continue;
+        const m = map[s.product_id] || { qty: 0, revenue: 0 };
+        m.qty += Number(s.qty) || 0;
+        m.revenue += Number(s.amount) || 0;
+        map[s.product_id] = m;
+      }
+      const rows = Object.entries(map)
+        .map(([id, v]) => ({ product: this.productById(id), ...v }))
+        .filter((r) => r.product)
+        .sort((a, b) => b.revenue - a.revenue);
+      const max = Math.max(1, ...rows.map((r) => r.revenue));
+      return rows.map((r) => ({ ...r, pct: Math.round((r.revenue / max) * 100) }));
+    },
+
     /* ---------- สรุปตัวเลขหน้าภาพรวม ---------- */
     get kpi() {
       const c = this.db.contents;
@@ -324,7 +531,7 @@ function cmsApp() {
       this.editor = {
         id: null, title: '', body: '', pillar: CFG.pillars[0],
         style_id: this.db.styles[0]?.id || '', hashtagsText: '',
-        channel_ids: [], media_ids: [], status: 'draft',
+        channel_ids: [], media_ids: [], product_ids: [], status: 'draft',
         scheduledInput: '', note: '',
       };
       this.go('editor');
@@ -335,7 +542,7 @@ function cmsApp() {
         id: c.id, title: c.title || '', body: c.body || '', pillar: c.pillar || CFG.pillars[0],
         style_id: c.style_id || '', hashtagsText: (c.hashtags || []).join(', '),
         channel_ids: [...(c.channel_ids || [])], media_ids: [...(c.media_ids || [])],
-        status: c.status || 'draft', scheduledInput: this.toLocalInput(c.scheduled_at), note: c.note || '',
+        product_ids: [...(c.product_ids || [])], status: c.status || 'draft', scheduledInput: this.toLocalInput(c.scheduled_at), note: c.note || '',
       };
       this.go('editor');
     },
@@ -384,6 +591,7 @@ function cmsApp() {
         hashtags: e.hashtagsText.split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean),
         channel_ids: [...e.channel_ids],
         media_ids: [...e.media_ids],
+        product_ids: [...(e.product_ids || [])],
         status: e.status,
         scheduled_at: this.fromLocalInput(e.scheduledInput),
         note: e.note || '',

@@ -36,14 +36,14 @@ window.CMS_SEED = (function () {
       id: 'ct-1', title: 'พากันไปดอยอินทนนท์ หมอกลงเต็มถนน', pillar: 'รีวิว / ประสบการณ์', style_id: 'st-1',
       body: 'ออกจากเชียงใหม่ตีห้า อากาศ 14 องศา หมอกลงจนมองเห็นไฟท้ายคันหน้าแค่ราง ๆ\n\nช่วงกม.ที่ 31 ขึ้นมาถึงจุดชมวิว พระอาทิตย์เพิ่งโผล่พอดี — ภาพนี้คือของจริง ไม่ได้แต่งสีเลยครับ\n\nใครจะขึ้นช่วงนี้ เตรียมเสื้อกันลมกับถุงมือกันหนาวไปด้วย แล้วออกเช้าหน่อยจะได้มุมสวยแบบนี้',
       hashtags: ['ทริปมอเตอร์ไซค์', 'ดอยอินทนนท์', 'เที่ยวเชียงใหม่'],
-      channel_ids: ['ch-fb', 'ch-tt'], media_ids: ['md-1'],
+      channel_ids: ['ch-fb', 'ch-tt'], media_ids: ['md-1'], product_ids: ['pd-1', 'pd-2'],
       status: 'published', scheduled_at: at(-4, 7, 30), published_at: at(-4, 7, 32), author: 'ทีมคอนเทนต์', note: '',
     },
     {
       id: 'ct-2', title: 'กล่องท้ายรถ 45 ลิตร ใส่ของได้แค่ไหน', pillar: 'ขายของ / โปรโมชัน', style_id: 'st-2',
       body: 'ไปทริป 3 วัน 2 คืน ต้องขนอะไรบ้าง? เราลองยัดจริงให้ดูแล้ว\n\n- เสื้อผ้า 3 ชุด + ชุดกันฝน\n- กล้อง + ขาตั้ง\n- ชุดเครื่องมือฉุกเฉิน\n\nยังเหลือที่ใส่หมวกกันน็อคได้อีกใบ ล็อกกันขโมยได้ ติดตั้งฟรีหน้าร้าน',
       hashtags: ['กล่องท้ายรถ', 'อุปกรณ์แต่งรถ'],
-      channel_ids: ['ch-fb', 'ch-ig'], media_ids: ['md-2', 'md-5'],
+      channel_ids: ['ch-fb', 'ch-ig'], media_ids: ['md-2', 'md-5'], product_ids: ['pd-1'],
       status: 'scheduled', scheduled_at: at(1, 19, 0), published_at: null, author: 'ทีมคอนเทนต์', note: '',
     },
     {
@@ -57,7 +57,7 @@ window.CMS_SEED = (function () {
       id: 'ct-4', title: 'ตกหมึกคืนเดือนมืด ต้องเตรียมอะไร', pillar: 'ให้ความรู้ / How-to', style_id: 'st-1',
       body: 'คืนเดือนมืดคือช่วงที่หมึกขึ้นดีที่สุด แต่ต้องเตรียมของให้พร้อม\n\n1. ไฟล่อหมึกสีเขียว กำลังไฟพอประมาณ อย่าแรงเกิน\n2. โยะ 2-3 สี สลับจนเจอสีที่หมึกกิน\n3. ถังน้ำแข็งแยกจากถังเก็บหมึก\n\nเทคนิคเล็ก ๆ คือรอให้ไฟนิ่งอย่างน้อย 20 นาทีก่อนเริ่มตี',
       hashtags: ['ตกหมึก', 'ตกปลา', 'ทะเลไทย'],
-      channel_ids: ['ch-tt', 'ch-yt'], media_ids: ['md-4'],
+      channel_ids: ['ch-tt', 'ch-yt'], media_ids: ['md-4'], product_ids: ['pd-3'],
       status: 'draft', scheduled_at: null, published_at: null, author: 'ทีมคอนเทนต์', note: '',
     },
     {
@@ -90,5 +90,24 @@ window.CMS_SEED = (function () {
     { id: 'ac-3', content_id: 'ct-1', action: 'เผยแพร่แล้ว',   actor: 'ระบบตั้งเวลา', note: 'Facebook, TikTok',     created_at: at(-4, 7, 32) },
   ];
 
-  return { channels, styles, media, contents, stats, activity };
+  const products = [
+    { id: 'pd-1', name: 'กล่องท้ายรถ 45 ลิตร พร้อมติดตั้ง', sku: 'TB-45', price: 3290, cost: 1850,
+      url: 'https://example.com/products/topbox-45', image_url: '', active: true, note: 'ขายดีสุด' },
+    { id: 'pd-2', name: 'ชุดแต่งกันลม รุ่นมาตรฐาน', sku: 'WS-01', price: 1590, cost: 820,
+      url: 'https://example.com/products/windshield', image_url: '', active: true, note: '' },
+    { id: 'pd-3', name: 'ไฟล่อหมึกสีเขียว 30W', sku: 'SQ-30', price: 890, cost: 410,
+      url: 'https://example.com/products/squid-light', image_url: '', active: true, note: 'ขายดีช่วงเดือนมืด' },
+  ];
+
+  // ยอดขายที่เกิดจากคอนเทนต์ — ตัวเลขนี้คือสิ่งที่ทำให้รู้ว่าโพสต์ไหนคุ้ม
+  const sales = [
+    { id: 'sl-1', content_id: 'ct-1', channel_id: 'ch-tt', product_id: 'pd-1', qty: 6,
+      amount: 19740, cost_amount: 11100, ad_spend: 1500, source: 'กรอกเอง', note: '', sold_at: at(-3) },
+    { id: 'sl-2', content_id: 'ct-1', channel_id: 'ch-fb', product_id: 'pd-2', qty: 3,
+      amount: 4770,  cost_amount: 2460,  ad_spend: 0,    source: 'กรอกเอง', note: '', sold_at: at(-2) },
+    { id: 'sl-3', content_id: 'ct-5', channel_id: 'ch-fb', product_id: 'pd-1', qty: 1,
+      amount: 3290,  cost_amount: 1850,  ad_spend: 800,  source: 'กรอกเอง', note: '', sold_at: at(-7) },
+  ];
+
+  return { channels, styles, media, contents, stats, activity, products, sales, clicks: [] };
 })();

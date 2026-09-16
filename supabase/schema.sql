@@ -223,3 +223,104 @@ alter table public.edit_jobs add column if not exists worker      text default '
 alter table public.edit_jobs add column if not exists log_tail    text default '';
 
 create index if not exists edit_jobs_status_idx on public.edit_jobs (status);
+
+-- ============================================================
+-- สินค้า / ลิงก์ติดตามผล / ยอดขาย — ส่วนที่ทำให้วัดเป็น "เงิน" ได้
+-- ============================================================
+
+create table if not exists public.products (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  sku        text default '',
+  price      numeric(12,2) default 0,      -- ราคาขาย
+  cost       numeric(12,2) default 0,      -- ต้นทุน (ไว้คิดกำไร)
+  url        text default '',              -- ลิงก์หน้าสินค้า/ร้าน
+  image_url  text default '',
+  active     boolean default true,
+  note       text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- คอนเทนต์ชิ้นนี้ขายสินค้าตัวไหนบ้าง
+alter table public.contents add column if not exists product_ids uuid[] default '{}';
+
+-- ลิงก์สั้นติดตามผล: 1 โพสต์ x 1 ช่อง = 1 ลิงก์ จะได้รู้ว่าคลิกมาจากไหน
+create table if not exists public.tracked_links (
+  id         uuid primary key default gen_random_uuid(),
+  code       text not null unique,          -- ตัวย่อในลิงก์ เช่น a7xk2p
+  content_id uuid references public.contents(id) on delete cascade,
+  channel_id uuid references public.channels(id) on delete set null,
+  product_id uuid references public.products(id) on delete set null,
+  target_url text not null,                 -- ปลายทางจริงที่จะพาไป
+  label      text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists tracked_links_code_idx    on public.tracked_links (code);
+create index if not exists tracked_links_content_idx on public.tracked_links (content_id);
+
+-- ทุกครั้งที่มีคนกดลิงก์ บันทึก 1 แถว (ไม่เก็บ IP — เก็บแค่ที่มาและชนิดเครื่อง)
+create table if not exists public.link_clicks (
+  id         uuid primary key default gen_random_uuid(),
+  link_id    uuid references public.tracked_links(id) on delete cascade,
+  referer    text default '',
+  user_agent text default '',
+  created_at timestamptz default now()
+);
+
+create index if not exists link_clicks_link_idx on public.link_clicks (link_id);
+
+-- ยอดขายที่เกิดจากคอนเทนต์ (กรอกเอง หรือให้ระบบอื่นยิงเข้ามาทีหลัง)
+create table if not exists public.sales (
+  id          uuid primary key default gen_random_uuid(),
+  content_id  uuid references public.contents(id) on delete set null,
+  channel_id  uuid references public.channels(id) on delete set null,
+  product_id  uuid references public.products(id) on delete set null,
+  qty         integer default 1,
+  amount      numeric(12,2) default 0,      -- ยอดขายรวม
+  cost_amount numeric(12,2) default 0,      -- ต้นทุนรวม
+  ad_spend    numeric(12,2) default 0,      -- ค่าแอดที่ลงไปกับคอนเทนต์นี้
+  source      text default 'กรอกเอง',
+  note        text default '',
+  sold_at     timestamptz default now(),
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create index if not exists sales_content_idx on public.sales (content_id);
+
+-- ---------- RLS ----------
+alter table public.products      enable row level security;
+alter table public.tracked_links enable row level security;
+alter table public.link_clicks   enable row level security;
+alter table public.sales         enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['products','tracked_links','sales']
+  loop
+    execute format('drop policy if exists %I on public.%I;', t || '_rw', t);
+    execute format(
+      'create policy %I on public.%I for all to authenticated using (true) with check (true);',
+      t || '_rw', t);
+  end loop;
+end $$;
+
+-- คลิก: หน้าเว็บอ่านได้ (ไว้ทำรายงาน) แต่เขียนได้เฉพาะ service_role ที่อยู่ใน Edge Function
+drop policy if exists link_clicks_read on public.link_clicks;
+create policy link_clicks_read on public.link_clicks for select to authenticated using (true);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['products','tracked_links','link_clicks','sales']
+  loop
+    execute format('drop trigger if exists %I on public.%I;', t || '_touch', t);
+    execute format(
+      'create trigger %I before update on public.%I for each row execute function public.touch_updated_at();',
+      t || '_touch', t);
+  end loop;
+end $$;
