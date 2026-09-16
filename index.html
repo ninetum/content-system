@@ -387,20 +387,20 @@
       <div class="card p-4 space-y-3">
         <h3 class="font-semibold text-sm" x-text="channelForm.id ? 'แก้ไขเพจ/ช่อง' : 'เพิ่มเพจ/ช่องใหม่'"></h3>
         <div class="grid md:grid-cols-2 gap-3">
-          <div><label class="label">ชื่อเพจ/ช่อง</label>
-            <input class="field" x-model="channelForm.name" placeholder="เช่น ร้านเราเอง Official"></div>
+          <div><label class="label">ชื่อเพจ/ช่อง <span style="color:var(--muted)">— ชื่อที่จะโชว์ในระบบ</span></label>
+            <input class="field" x-model="channelForm.name" placeholder="เช่น ดีบักชีวิต"></div>
           <div><label class="label">แพลตฟอร์ม</label>
             <select class="field" x-model="channelForm.platform">
               <template x-for="p in cfg.platforms" :key="p.id">
                 <option :value="p.id" x-text="p.icon + ' ' + p.name"></option>
               </template>
             </select></div>
-          <div><label class="label">ชื่อผู้ใช้ / ลิงก์</label>
-            <input class="field" x-model="channelForm.handle" placeholder="@yourpage"></div>
+          <div><label class="label">ลิงก์เพจ <span style="color:var(--muted)">— วาง URL จากแถบที่อยู่</span></label>
+            <input class="field" x-model="channelForm.handle" placeholder="https://www.facebook.com/yourpage"></div>
           <div><label class="label">จำนวนผู้ติดตาม</label>
             <input type="number" class="field num" x-model="channelForm.followers"></div>
-          <div class="md:col-span-2"><label class="label">โน้ตภายใน</label>
-            <input class="field" x-model="channelForm.note" placeholder="เช่น เพจหลัก ยิงแอดประจำ"></div>
+          <div class="md:col-span-2"><label class="label">โน้ตภายใน <span style="color:var(--muted)">— ไม่บังคับ</span></label>
+            <input class="field" x-model="channelForm.note" placeholder="เช่น เพจหลัก ยิงแอดประจำ / กลุ่มเป้าหมายสายลุย"></div>
         </div>
         <label class="flex items-center gap-2 text-sm">
           <input type="checkbox" x-model="channelForm.active" class="w-4 h-4 accent-blue-500">
