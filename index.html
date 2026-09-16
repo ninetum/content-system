@@ -29,7 +29,63 @@
   </div>
 </div>
 
-<div x-show="!booting" class="flex">
+<!-- ===== หน้าเข้าสู่ระบบ ===== -->
+<div x-show="!booting && needLogin" class="min-h-screen grid place-items-center p-4">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-5">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center text-2xl mx-auto mb-3"
+           style="background:var(--accent-soft)">🗂️</div>
+      <h1 class="font-bold text-lg">ระบบบริหารคอนเทนต์</h1>
+      <p class="text-xs mt-1" style="color:var(--muted)">เข้าสู่ระบบเพื่อใช้งานข้อมูลของทีม</p>
+    </div>
+
+    <div class="card p-5 space-y-3">
+      <div class="flex gap-1 p-1 rounded-lg" style="background:var(--surface-2)">
+        <button class="flex-1 py-1.5 rounded-md text-xs font-semibold transition"
+                :style="login.mode==='password' ? 'background:var(--accent); color:#fff' : 'color:var(--text-2)'"
+                @click="login.mode='password'">รหัสผ่าน</button>
+        <button class="flex-1 py-1.5 rounded-md text-xs font-semibold transition"
+                :style="login.mode==='link' ? 'background:var(--accent); color:#fff' : 'color:var(--text-2)'"
+                @click="login.mode='link'">ลิงก์ทางอีเมล</button>
+      </div>
+
+      <div>
+        <label class="label">อีเมล</label>
+        <input type="email" class="field" x-model="login.email" autocomplete="username"
+               placeholder="you@example.com" @keydown.enter="doLogin()">
+      </div>
+
+      <div x-show="login.mode==='password'">
+        <label class="label">รหัสผ่าน</label>
+        <input type="password" class="field" x-model="login.password" autocomplete="current-password"
+               placeholder="••••••••" @keydown.enter="doLogin()">
+      </div>
+
+      <p x-show="login.mode==='link'" class="text-[11px]" style="color:var(--muted)">
+        ระบบจะส่งลิงก์เข้าระบบไปที่อีเมล ไม่ต้องจำรหัสผ่าน — ต้องเปิดลิงก์จากเครื่องเดียวกันนี้
+      </p>
+
+      <button class="btn btn-primary w-full" @click="doLogin()" :disabled="authBusy">
+        <span x-text="authBusy ? 'กำลังดำเนินการ…' : (login.mode==='link' ? 'ส่งลิงก์เข้าระบบ' : 'เข้าสู่ระบบ')"></span>
+      </button>
+
+      <div class="flex items-center justify-between text-[11px]">
+        <button style="color:var(--accent)" @click="doResetPassword()" :disabled="authBusy"
+                x-show="login.mode==='password'">ลืมรหัสผ่าน?</button>
+        <button class="ml-auto" style="color:var(--muted)"
+                @click="settings.mode='local'; applySettings(); go('dashboard')">
+          ใช้โหมดทดลองแทน →
+        </button>
+      </div>
+    </div>
+
+    <p class="text-[11px] text-center mt-4 leading-relaxed" style="color:var(--muted)">
+      ยังไม่มีบัญชี? ให้แอดมินเพิ่มผู้ใช้ให้ที่ Supabase Dashboard →<br>Authentication → Users → Add user
+    </p>
+  </div>
+</div>
+
+<div x-show="!booting && !needLogin" class="flex">
 
   <!-- ===== แถบเมนูซ้าย ===== -->
   <div x-show="sidebarOpen" @click="sidebarOpen=false"
@@ -110,6 +166,7 @@
       <p x-show="mode!=='supabase'" style="color:var(--muted)">
         ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ไปที่ “ตั้งค่าระบบ” เพื่อเชื่อมฐานข้อมูลจริง
       </p>
+      <p x-show="session" class="truncate" style="color:var(--muted)" x-text="'เข้าใช้งานโดย ' + userEmail"></p>
     </div>
   </aside>
 
@@ -126,8 +183,15 @@
           editjobs:'โรงตัดคลิป', reports:'รายงานแสดงผล', settings:'ตั้งค่าระบบ'}[view]"></h1>
       </div>
       <div class="ml-auto flex items-center gap-2">
+        <template x-if="session">
+          <span class="text-[11px] hidden md:inline truncate max-w-[180px]" style="color:var(--muted)"
+                :title="userEmail" x-text="userEmail"></span>
+        </template>
         <button class="btn btn-ghost btn-sm hidden sm:inline-flex" @click="go('queue')">📅 ดูคิว</button>
         <button class="btn btn-primary btn-sm" @click="newContent()">✚ สร้างคอนเทนต์</button>
+        <template x-if="session">
+          <button class="btn btn-ghost btn-sm" @click="doLogout()" title="ออกจากระบบ">ออกจากระบบ</button>
+        </template>
       </div>
     </header>
 
@@ -1054,6 +1118,13 @@
           <p class="text-[11px]" style="color:var(--warning)">
             ⚠️ ใช้ได้เฉพาะ anon key เท่านั้น และต้องเปิด RLS ทุกตาราง — ห้ามใส่ service_role key ในหน้าเว็บ
           </p>
+          <div class="card-2 p-3 text-[11px] space-y-1.5" style="color:var(--text-2)">
+            <div class="font-semibold">การจัดการผู้ใช้</div>
+            <p>เมื่อใช้โหมดนี้ ระบบจะบังคับให้เข้าสู่ระบบก่อน (ตรงกับ policy ที่ตั้งไว้ใน schema.sql)</p>
+            <p>เพิ่มผู้ใช้ที่ Supabase Dashboard → Authentication → Users → Add user</p>
+            <p style="color:var(--warning)">แนะนำให้ปิด “Allow new users to sign up” ใน Authentication → Sign In / Providers
+              เพื่อไม่ให้คนนอกสมัครเองแล้วเห็นข้อมูลทีม</p>
+          </div>
         </div>
         <div class="flex gap-2">
           <button class="btn btn-primary" @click="applySettings()" :disabled="settingsBusy">บันทึกและใช้งาน</button>

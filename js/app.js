@@ -14,6 +14,12 @@ function cmsApp() {
     db: { channels: [], styles: [], media: [], contents: [], stats: [], activity: [], editJobs: [] },
     mode: 'local',
 
+    // ระบบล็อกอิน (ใช้เฉพาะโหมด supabase)
+    session: null,
+    needLogin: false,
+    authBusy: false,
+    login: { email: '', password: '', mode: 'password' },   // password | link
+
     // ตัวกรอง
     search: '',
     filterStatus: 'all',
@@ -55,6 +61,17 @@ function cmsApp() {
         await Store.init();
         this.refresh();
         this.mode = Store.state.mode;
+        this.syncAuth();
+        Store.onAuthChange(async (session) => {
+          this.session = session;
+          if (session) {
+            await Store.loadAll();
+            this.refresh();
+            this.needLogin = false;
+          } else if (this.mode === 'supabase') {
+            this.needLogin = true;
+          }
+        });
         const c = Store.loadConfig();
         this.settings = { mode: Store.state.mode, url: c.url || '', key: c.key || '' };
         this.ready = true;
@@ -79,6 +96,61 @@ function cmsApp() {
       this.view = v;
       this.sidebarOpen = false;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    /* ---------- ระบบล็อกอิน ---------- */
+    syncAuth() {
+      this.session = Store.state.session;
+      this.needLogin = this.mode === 'supabase' && !this.session;
+    },
+
+    get userEmail() { return this.session?.user?.email || ''; },
+
+    async doLogin() {
+      const email = this.login.email.trim();
+      if (!email) { this.toast('กรอกอีเมลก่อนครับ', 'warn'); return; }
+      this.authBusy = true;
+      try {
+        if (this.login.mode === 'link') {
+          await Store.signInWithLink(email);
+          this.toast('ส่งลิงก์เข้าระบบไปที่อีเมลแล้ว เปิดลิงก์จากเครื่องนี้ได้เลยครับ', 'ok');
+        } else {
+          if (!this.login.password) { this.toast('กรอกรหัสผ่านด้วยครับ', 'warn'); return; }
+          await Store.signIn(email, this.login.password);
+          this.refresh();
+          this.needLogin = false;
+          this.session = Store.state.session;
+          this.login.password = '';
+          this.toast('ยินดีต้อนรับครับ', 'ok');
+        }
+      } catch (e) {
+        this.toast(e.message || String(e), 'err');
+      } finally {
+        this.authBusy = false;
+      }
+    },
+
+    async doResetPassword() {
+      const email = this.login.email.trim();
+      if (!email) { this.toast('กรอกอีเมลที่จะรีเซ็ตก่อนครับ', 'warn'); return; }
+      this.authBusy = true;
+      try {
+        await Store.resetPassword(email);
+        this.toast('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลแล้วครับ', 'ok');
+      } catch (e) {
+        this.toast(e.message || String(e), 'err');
+      } finally {
+        this.authBusy = false;
+      }
+    },
+
+    async doLogout() {
+      if (!confirm('ออกจากระบบเลยไหมครับ?')) return;
+      await Store.signOut();
+      this.session = null;
+      this.refresh();
+      this.needLogin = true;
+      this.toast('ออกจากระบบแล้ว', 'ok');
     },
 
     /* ---------- toast ---------- */
@@ -686,7 +758,12 @@ function cmsApp() {
         await Store.switchMode(this.settings.mode, this.settings.url.trim(), this.settings.key.trim());
         this.refresh();
         this.mode = Store.state.mode;
-        this.toast(this.mode === 'supabase' ? 'สลับไปใช้ Supabase แล้ว' : 'ใช้โหมดทดลองในเครื่อง', 'ok');
+        this.syncAuth();
+        if (this.needLogin) {
+          this.toast('เชื่อม Supabase แล้ว — เข้าสู่ระบบก่อนใช้งานครับ', 'ok');
+        } else {
+          this.toast(this.mode === 'supabase' ? 'สลับไปใช้ Supabase แล้ว' : 'ใช้โหมดทดลองในเครื่อง', 'ok');
+        }
       } catch (e) {
         this.toast(e.message || String(e), 'err');
       } finally {

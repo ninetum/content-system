@@ -23,6 +23,7 @@ window.Store = (function () {
     url: '',
     key: '',
     lastError: '',
+    session: null,      // เซสชันผู้ใช้ (เฉพาะโหมด supabase)
     db: null,           // แคชข้อมูลในหน่วยความจำ (ใช้เป็นแหล่งจริงในโหมด local)
   };
 
@@ -162,6 +163,67 @@ window.Store = (function () {
     return { ok: true, message: 'เชื่อมต่อ Supabase สำเร็จ อ่านตาราง channels ได้' };
   }
 
+  /* ---------- ระบบล็อกอิน (เฉพาะโหมด supabase) ----------
+   * โหมดทดลองไม่ต้องล็อกอิน เพราะข้อมูลอยู่ในเบราว์เซอร์เครื่องนั้นอยู่แล้ว
+   * ส่วนโหมด supabase ต้องมีเซสชัน เพราะ policy ใน schema.sql เปิดให้เฉพาะ authenticated
+   */
+  async function readSession() {
+    if (!state.client) { state.session = null; return null; }
+    const { data, error } = await state.client.auth.getSession();
+    if (error) { state.lastError = error.message; state.session = null; return null; }
+    state.session = data.session || null;
+    return state.session;
+  }
+
+  async function signIn(email, password) {
+    if (!state.client) throw new Error('ยังไม่ได้เชื่อม Supabase — ไปตั้งค่าที่หน้า “ตั้งค่าระบบ” ก่อนครับ');
+    const { data, error } = await state.client.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(translateAuthError(error.message));
+    state.session = data.session;
+    await loadAll();
+    return state.session;
+  }
+
+  async function signInWithLink(email) {
+    if (!state.client) throw new Error('ยังไม่ได้เชื่อม Supabase — ไปตั้งค่าที่หน้า “ตั้งค่าระบบ” ก่อนครับ');
+    const { error } = await state.client.auth.signInWithOtp({
+      email, options: { emailRedirectTo: window.location.origin + window.location.pathname },
+    });
+    if (error) throw new Error(translateAuthError(error.message));
+  }
+
+  async function resetPassword(email) {
+    if (!state.client) throw new Error('ยังไม่ได้เชื่อม Supabase ครับ');
+    const { error } = await state.client.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    if (error) throw new Error(translateAuthError(error.message));
+  }
+
+  async function signOut() {
+    if (state.client) await state.client.auth.signOut();
+    state.session = null;
+    state.db = emptyDb();
+  }
+
+  function onAuthChange(cb) {
+    if (!state.client) return;
+    state.client.auth.onAuthStateChange((_event, session) => {
+      state.session = session || null;
+      cb(state.session);
+    });
+  }
+
+  // แปลข้อความ error ของ Supabase เป็นไทยเฉพาะเคสที่เจอบ่อย
+  function translateAuthError(msg) {
+    const m = (msg || '').toLowerCase();
+    if (m.includes('invalid login credentials')) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+    if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — เช็กกล่องจดหมายก่อนนะครับ';
+    if (m.includes('rate limit') || m.includes('too many')) return 'ขอบ่อยเกินไป รอสักครู่แล้วลองใหม่ครับ';
+    if (m.includes('signups not allowed')) return 'ระบบปิดการสมัครเอง — ให้แอดมินเพิ่มผู้ใช้ให้ที่ Supabase Dashboard';
+    return msg;
+  }
+
   /* ---------- init ---------- */
   async function init() {
     const cfg = loadConfig();
@@ -173,6 +235,15 @@ window.Store = (function () {
     } else {
       state.mode = 'local';
     }
+
+    if (state.mode === 'supabase') {
+      await readSession();
+      if (!state.session) {      // ยังไม่ล็อกอิน — ยังไม่ต้องดึงข้อมูล
+        state.db = emptyDb();
+        return state;
+      }
+    }
+
     await loadAll();
     return state;
   }
@@ -187,6 +258,14 @@ window.Store = (function () {
     state.url = url || '';
     state.key = key || '';
     saveConfig({ mode, url: state.url, key: state.key });
+
+    if (mode === 'supabase') {
+      await readSession();
+      if (!state.session) { state.db = emptyDb(); return state; }
+    } else {
+      state.session = null;
+    }
+
     await loadAll();
     return state;
   }
@@ -213,6 +292,7 @@ window.Store = (function () {
   return {
     state, TABLES, uid,
     init, loadAll, create, update, remove,
+    readSession, signIn, signInWithLink, resetPassword, signOut, onAuthChange,
     testConnection, switchMode, resetLocal, exportJson, importJson, loadConfig,
     get db() { return state.db; },
   };
