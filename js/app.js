@@ -557,6 +557,27 @@ function cmsApp() {
       };
     },
 
+    /* โพสต์ที่ควร Boost
+     * หลักการ: ปล่อย organic ก่อน ตัวไหนคนกดดีเองค่อยเอาเงินไปดัน
+     * ต่างจากการยิงแอดตั้งแต่วันแรกตรงที่เรารู้แล้วว่าคนสนใจจริง ไม่ใช่เดา
+     */
+    get boostCandidates() {
+      const since = Date.now() - 14 * 86400000;
+      return this.db.contents
+        .filter((c) => c.published_at && new Date(c.published_at).getTime() >= since && !c.boosted)
+        .map((c) => ({ content: c, ...this.money(c.id) }))
+        .filter((r) => r.clicks > 0)
+        .sort((a, b) => (b.epc - a.epc) || (b.clicks - a.clicks))
+        .slice(0, 8);
+    },
+
+    async markBoosted(c) {
+      await this.run(async () => {
+        await Store.update('contents', c.id, { boosted: true });
+        this.refresh();
+      }, 'ทำเครื่องหมายว่าดันแล้ว');
+    },
+
     // อันดับคอนเทนต์ตามรายได้ — ใช้ตอบว่า "ควรทำคอนเทนต์แบบไหนต่อ"
     get revenueRanking() {
       const rows = this.db.contents
@@ -698,6 +719,7 @@ function cmsApp() {
         id: null, title: '', body: '', pillar: CFG.pillars[0],
         style_id: this.db.styles[0]?.id || '', hashtagsText: '',
         channel_ids: [], media_ids: [], product_ids: [], status: 'draft',
+        auto_comment: true, comment_text: '',
         scheduledInput: '', note: '',
       };
       this.go('editor');
@@ -708,7 +730,8 @@ function cmsApp() {
         id: c.id, title: c.title || '', body: c.body || '', pillar: c.pillar || CFG.pillars[0],
         style_id: c.style_id || '', hashtagsText: (c.hashtags || []).join(', '),
         channel_ids: [...(c.channel_ids || [])], media_ids: [...(c.media_ids || [])],
-        product_ids: [...(c.product_ids || [])], status: c.status || 'draft', scheduledInput: this.toLocalInput(c.scheduled_at), note: c.note || '',
+        product_ids: [...(c.product_ids || [])], status: c.status || 'draft',
+        auto_comment: c.auto_comment !== false, comment_text: c.comment_text || '', scheduledInput: this.toLocalInput(c.scheduled_at), note: c.note || '',
       };
       this.go('editor');
     },
@@ -758,6 +781,8 @@ function cmsApp() {
         channel_ids: [...e.channel_ids],
         media_ids: [...e.media_ids],
         product_ids: [...(e.product_ids || [])],
+        auto_comment: !!e.auto_comment,
+        comment_text: e.comment_text || '',
         status: e.status,
         scheduled_at: this.fromLocalInput(e.scheduledInput),
         note: e.note || '',
@@ -1033,9 +1058,23 @@ function cmsApp() {
 
     /* ---------- เพจ & ช่อง ---------- */
     newChannel() {
-      this.channelForm = { id: null, name: '', platform: 'facebook', handle: '', followers: 0, active: true, note: '' };
+      this.channelForm = {
+        id: null, name: '', platform: 'facebook', handle: '', followers: 0,
+        active: true, note: '',
+        auto_post: false, posts_per_day: 4, min_gap_minutes: 90,
+        no_repeat_days: 21, time_slots: '7,12,18,21',
+      };
     },
-    editChannel(c) { this.channelForm = { ...c }; },
+    editChannel(c) {
+      this.channelForm = {
+        ...c,
+        auto_post: !!c.auto_post,
+        posts_per_day: c.posts_per_day ?? 4,
+        min_gap_minutes: c.min_gap_minutes ?? 90,
+        no_repeat_days: c.no_repeat_days ?? 21,
+        time_slots: c.time_slots || '7,12,18,21',
+      };
+    },
     async saveChannel() {
       const f = this.channelForm;
       if (!f.name.trim()) { this.toast('ใส่ชื่อเพจ/ช่องก่อนครับ', 'warn'); return; }
@@ -1043,6 +1082,11 @@ function cmsApp() {
         const payload = {
           name: f.name.trim(), platform: f.platform, handle: f.handle.trim(),
           followers: Number(f.followers) || 0, active: !!f.active, note: f.note || '',
+          auto_post: !!f.auto_post,
+          posts_per_day: Number(f.posts_per_day) || 0,
+          min_gap_minutes: Number(f.min_gap_minutes) || 0,
+          no_repeat_days: Number(f.no_repeat_days) || 0,
+          time_slots: (f.time_slots || '').trim(),
         };
         if (f.id) await Store.update('channels', f.id, payload);
         else await Store.create('channels', payload);

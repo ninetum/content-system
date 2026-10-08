@@ -133,6 +133,23 @@ async function postToInstagram(cred: Cred, text: string, imageUrls: string[]) {
   return data.id;
 }
 
+/* ---------- คอมเมนต์แรก (Facebook) ----------
+ * Facebook ลดการมองเห็นโพสต์ที่มีลิงก์ออกนอกแพลตฟอร์ม
+ * วิธีที่คนทำเพจใช้กันคือโพสต์เนื้อหาเปล่า ๆ แล้วปักลิงก์ในคอมเมนต์แรกแทน
+ * ฟังก์ชันนี้ทำขั้นนั้นให้อัตโนมัติทันทีหลังโพสต์สำเร็จ
+ */
+async function commentOnPost(cred: Cred, postId: string, message: string) {
+  if (!postId || !message.trim()) return '';
+  const res = await fetch(`${GRAPH}/${postId}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, access_token: cred.access_token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message ?? 'คอมเมนต์ลิงก์ไม่สำเร็จ');
+  return data.id as string;
+}
+
 /* ---------- LINE OA ---------- */
 async function postToLine(cred: Cred, text: string, imageUrls: string[]) {
   const messages: Record<string, unknown>[] = [{ type: 'text', text }];
@@ -160,38 +177,74 @@ Deno.serve(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  // 1) ตรวจก่อนว่าคนสั่งโพสต์ล็อกอินจริง
+  // 1) ใครเรียกมา — คนที่ล็อกอิน หรือตัวจับเวลา (pg_cron ที่ถือ service role key)
   const authHeader = req.headers.get('Authorization') ?? '';
-  const asUser = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-  const { data: userData, error: userErr } = await asUser.auth.getUser();
-  if (userErr || !userData?.user) return json({ error: 'ยังไม่ได้เข้าสู่ระบบ' }, 401);
+  const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const isScheduler = !!bearer && bearer === service;
+
+  let actor = 'ระบบตั้งเวลา';
+  if (!isScheduler) {
+    const asUser = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData, error: userErr } = await asUser.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: 'ยังไม่ได้เข้าสู่ระบบ' }, 401);
+    actor = userData.user.email ?? 'ผู้ใช้งาน';
+  }
 
   // 2) จากตรงนี้ใช้สิทธิ์ service role เพื่ออ่านโทเคน (หน้าเว็บอ่านตารางนี้ไม่ได้)
   const admin = createClient(url, service);
 
-  let body: { content_id?: string; channel_ids?: string[] };
+  let body: { content_id?: string; channel_ids?: string[]; mode?: string };
   try {
     body = await req.json();
   } catch {
-    return json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, 400);
+    body = {};
   }
+
+  // ---------- โหมดตัวจับเวลา: หาคอนเทนต์ที่ถึงคิวแล้วยิงให้หมด ----------
+  if (body.mode === 'due') {
+    if (!isScheduler) return json({ error: 'โหมดนี้เรียกได้เฉพาะตัวจับเวลา' }, 403);
+
+    const { data: due } = await admin
+      .from('contents')
+      .select('id, title, scheduled_at')
+      .eq('status', 'scheduled')
+      .lte('scheduled_at', new Date().toISOString())
+      .order('scheduled_at', { ascending: true })
+      .limit(10);
+
+    const ran: unknown[] = [];
+    for (const c of due ?? []) {
+      const r = await publishContent(admin, c.id, null, actor);
+      ran.push({ content_id: c.id, title: c.title, ok: r.ok });
+    }
+    return json({ mode: 'due', checked: (due ?? []).length, ran });
+  }
+
   if (!body.content_id) return json({ error: 'ต้องระบุ content_id' }, 400);
 
-  const { data: content, error: cErr } = await admin
-    .from('contents').select('*').eq('id', body.content_id).single();
-  if (cErr || !content) return json({ error: 'ไม่พบคอนเทนต์นี้' }, 404);
+  const result = await publishContent(admin, body.content_id, body.channel_ids ?? null, actor);
+  return json(result, result.ok ? 200 : 502);
+});
 
-  const targetIds: string[] = body.channel_ids?.length ? body.channel_ids : (content.channel_ids ?? []);
-  if (!targetIds.length) return json({ error: 'คอนเทนต์นี้ยังไม่ได้เลือกช่องปลายทาง' }, 400);
+/* ---------- ตรรกะการโพสต์จริง ใช้ร่วมกันทั้งโหมดกดเองและโหมดตั้งเวลา ---------- */
+// deno-lint-ignore no-explicit-any
+async function publishContent(admin: any, contentId: string, onlyChannels: string[] | null, actor: string) {
+  const { data: content } = await admin.from('contents').select('*').eq('id', contentId).single();
+  if (!content) return { ok: false, error: 'ไม่พบคอนเทนต์นี้', results: [] };
 
-  // ประกอบข้อความ: เนื้อหา + แฮชแท็ก
+  const targetIds: string[] = onlyChannels?.length ? onlyChannels : (content.channel_ids ?? []);
+  if (!targetIds.length) return { ok: false, error: 'คอนเทนต์นี้ยังไม่ได้เลือกช่องปลายทาง', results: [] };
+
   const tags = (content.hashtags ?? []).map((h: string) => `#${h}`).join(' ');
   const text = [content.body, tags].filter(Boolean).join('\n\n');
 
-  // ลิงก์รูปจากแกลลอรี่ (ต้องเป็น URL สาธารณะ ไม่งั้น IG จะไม่รับ)
   const { data: media } = await admin
     .from('media_assets').select('id,url,kind').in('id', content.media_ids ?? []);
-  const imageUrls = (media ?? []).filter((m) => m.kind === 'image').map((m) => m.url);
+  const imageUrls = (media ?? []).filter((m: any) => m.kind === 'image').map((m: any) => m.url);
+
+  // ลิงก์ติดตามผลของคอนเทนต์นี้ ไว้เอาไปปักในคอมเมนต์แรก
+  const { data: links } = await admin
+    .from('tracked_links').select('code, channel_id, label').eq('content_id', contentId);
 
   const results: Record<string, unknown>[] = [];
 
@@ -200,7 +253,7 @@ Deno.serve(async (req) => {
     const { data: cred } = await admin
       .from('channel_credentials').select('*').eq('channel_id', channelId).maybeSingle();
 
-    let ok = false, postId = '', error = '';
+    let ok = false, postId = '', error = '', commentId = '', commentError = '';
 
     try {
       if (!channel) throw new Error('ไม่พบช่องนี้ในระบบ');
@@ -210,37 +263,76 @@ Deno.serve(async (req) => {
         throw new Error(`โทเคนของ "${channel.name}" หมดอายุแล้ว ต้องต่ออายุก่อน`);
       }
 
+      // กติกากันยิงรัว — เว้นระยะขั้นต่ำจากโพสต์ล่าสุดของช่องนี้
+      const gap = Number(channel.min_gap_minutes) || 0;
+      if (gap > 0) {
+        const since = new Date(Date.now() - gap * 60000).toISOString();
+        const { count } = await admin
+          .from('publish_results')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel_id', channelId).eq('ok', true).gte('created_at', since);
+        if ((count ?? 0) > 0) throw new Error(`เพิ่งโพสต์ช่องนี้ไปไม่ถึง ${gap} นาที เลื่อนไปรอบหน้า`);
+      }
+
+      // กติกาจำกัดจำนวนต่อวัน
+      const perDay = Number(channel.posts_per_day) || 0;
+      if (perDay > 0) {
+        const dayAgo = new Date(Date.now() - 86400000).toISOString();
+        const { count } = await admin
+          .from('publish_results')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel_id', channelId).eq('ok', true).gte('created_at', dayAgo);
+        if ((count ?? 0) >= perDay) throw new Error(`ช่องนี้โพสต์ครบ ${perDay} ครั้งใน 24 ชม. แล้ว`);
+      }
+
       if (channel.platform === 'facebook')       postId = await postToFacebook(cred, text, imageUrls);
       else if (channel.platform === 'instagram') postId = await postToInstagram(cred, text, imageUrls);
       else if (channel.platform === 'line')      postId = await postToLine(cred, text, imageUrls);
       else throw new Error(`ยังไม่รองรับการโพสต์อัตโนมัติสำหรับ ${channel.platform}`);
 
       ok = true;
+
+      // คอมเมนต์แรก: ปักลิงก์ต่อทันที (เฉพาะ Facebook)
+      if (ok && channel.platform === 'facebook' && content.auto_comment !== false) {
+        try {
+          const mine = (links ?? []).filter((l: any) => !l.channel_id || l.channel_id === channelId);
+          const linkLines = mine.map((l: any) =>
+            `${l.label ? l.label + ': ' : ''}${Deno.env.get('SUPABASE_URL')}/functions/v1/r/${l.code}`);
+          const msg = (content.comment_text && content.comment_text.trim())
+            || (linkLines.length
+              ? ['ลิงก์อยู่ตรงนี้ครับ 👇', ...linkLines, '', '* กดผ่านลิงก์นี้ผมได้ค่าคอมจากร้านค้า คุณจ่ายเท่าเดิมครับ'].join('\n')
+              : '');
+          if (msg) commentId = await commentOnPost(cred, postId, msg);
+        } catch (e) {
+          // คอมเมนต์พลาดไม่ควรทำให้ถือว่าโพสต์ล้มเหลว — บันทึกไว้ให้เห็นแทน
+          commentError = e instanceof Error ? e.message : String(e);
+        }
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
 
     await admin.from('publish_results').insert({
-      content_id: content.id, channel_id: channelId,
+      content_id: contentId, channel_id: channelId,
       platform: channel?.platform ?? '', ok, external_post_id: postId, error,
+      comment_id: commentId, comment_error: commentError,
     });
 
-    results.push({ channel_id: channelId, channel: channel?.name ?? '', ok, post_id: postId, error });
+    results.push({ channel_id: channelId, channel: channel?.name ?? '', ok, post_id: postId, error, comment_id: commentId, comment_error: commentError });
   }
 
-  // สำเร็จอย่างน้อย 1 ช่อง → อัปเดตสถานะคอนเทนต์เป็นเผยแพร่แล้ว
   const anyOk = results.some((r) => r.ok);
   if (anyOk) {
     await admin.from('contents')
       .update({ status: 'published', published_at: new Date().toISOString() })
-      .eq('id', content.id);
+      .eq('id', contentId);
     await admin.from('activity_log').insert({
-      content_id: content.id,
+      content_id: contentId,
       action: 'เผยแพร่แล้ว',
-      actor: userData.user.email ?? 'ระบบ',
+      actor,
       note: results.filter((r) => r.ok).map((r) => r.channel).join(', '),
     });
   }
 
-  return json({ ok: anyOk, results }, anyOk ? 200 : 502);
-});
+  return { ok: anyOk, results };
+}

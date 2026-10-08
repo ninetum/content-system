@@ -406,6 +406,31 @@
           <input type="checkbox" x-model="channelForm.active" class="w-4 h-4 accent-blue-500">
           <span>เปิดใช้งานช่องนี้</span>
         </label>
+
+        <div class="card-2 p-3 space-y-3">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" x-model="channelForm.auto_post" class="w-4 h-4 accent-blue-500">
+            <span class="font-semibold">🤖 ให้ระบบโพสต์เองตามเวลา</span>
+          </label>
+          <p class="text-[11px]" style="color:var(--text-2)">
+            ต้องผูก Page Access Token ไว้แล้ว และตั้งตัวจับเวลาใน Supabase
+            (วิธีอยู่ใน <code>docs/META-API.md</code>)
+          </p>
+
+          <div class="grid sm:grid-cols-2 gap-2">
+            <div><label class="label">โพสต์ได้สูงสุด/วัน</label>
+              <input type="number" class="field num" x-model="channelForm.posts_per_day"></div>
+            <div><label class="label">เว้นขั้นต่ำ (นาที)</label>
+              <input type="number" class="field num" x-model="channelForm.min_gap_minutes"></div>
+            <div><label class="label">กันโพสต์สินค้าซ้ำ (วัน)</label>
+              <input type="number" class="field num" x-model="channelForm.no_repeat_days"></div>
+            <div><label class="label">ช่วงเวลาโพสต์ (ชม. คั่นด้วย ,)</label>
+              <input class="field num" x-model="channelForm.time_slots" placeholder="7,12,18,21"></div>
+          </div>
+          <p class="text-[11px]" style="color:var(--muted)">
+            สองค่าแรกคือตัวกัน Facebook มองว่าผิดปกติ — ยิงรัวเกินหรือซ้ำเกินมีผลกับการมองเห็นจริง
+          </p>
+        </div>
         <div class="flex gap-2">
           <button class="btn btn-primary" @click="saveChannel()">บันทึก</button>
           <button class="btn btn-ghost" @click="channelForm=null">ยกเลิก</button>
@@ -439,6 +464,15 @@
               <span>👥 <span class="num font-semibold" x-text="fmtNum(c.followers)"></span> ผู้ติดตาม</span>
               <span>🗂️ <span class="num font-semibold"
                     x-text="db.contents.filter(x=>(x.channel_ids||[]).includes(c.id)).length"></span> คอนเทนต์</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 mt-2 text-[11px]">
+              <template x-if="c.auto_post">
+                <span class="badge badge-scheduled">🤖 โพสต์เอง</span>
+              </template>
+              <template x-if="c.auto_post">
+                <span class="card-2 px-2 py-0.5 rounded num"
+                      x-text="`${c.posts_per_day||0}/วัน · เว้น ${c.min_gap_minutes||0} นาที · ${c.time_slots||''}`"></span>
+              </template>
             </div>
             <p x-show="c.note" class="text-[11px] mt-2 line-clamp-2" style="color:var(--muted)" x-text="c.note"></p>
             <div class="flex gap-2 mt-3">
@@ -690,6 +724,22 @@
             <div>
               <label class="label">แฮชแท็ก (คั่นด้วยจุลภาค)</label>
               <input class="field" x-model="editor.hashtagsText" placeholder="ทริปมอเตอร์ไซค์, รีวิวอุปกรณ์">
+            </div>
+
+            <div class="card-2 p-3 space-y-2">
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" class="w-4 h-4 accent-blue-500" x-model="editor.auto_comment">
+                <span class="font-semibold">💬 ปักลิงก์ในคอมเมนต์แรกอัตโนมัติ</span>
+              </label>
+              <p class="text-[11px]" style="color:var(--text-2)">
+                Facebook ลดการมองเห็นโพสต์ที่มีลิงก์ออกนอก — โพสต์หลักจึงไม่ควรมีลิงก์
+                ระบบจะโพสต์เนื้อหาก่อน แล้วปักลิงก์ติดตามผลในคอมเมนต์แรกให้ทันที
+              </p>
+              <div x-show="editor.auto_comment">
+                <label class="label">ข้อความคอมเมนต์ (เว้นว่างได้ ระบบเขียนให้เอง)</label>
+                <textarea class="field" rows="2" x-model="editor.comment_text"
+                          placeholder="เว้นว่าง = ระบบใส่ลิงก์ติดตามผลพร้อมคำชี้แจงค่าคอมให้"></textarea>
+              </div>
             </div>
 
             <div>
@@ -1699,6 +1749,26 @@
               </div>
             </template>
           </div>
+        </div>
+      </div>
+
+      <div class="card p-4" x-show="boostCandidates.length">
+        <h2 class="font-semibold text-sm mb-1">🚀 โพสต์ที่ควรเอาเงินไปดัน</h2>
+        <p class="text-[11px] mb-3" style="color:var(--text-2)">
+          โพสต์ใน 14 วันล่าสุดที่คนกดลิงก์เองโดยไม่ต้องยิงแอด — เรียงตาม EPC
+          ดันตัวที่พิสูจน์แล้วว่าคนสนใจ ดีกว่ายิงแอดตั้งแต่วันแรกแล้วเดา
+        </p>
+        <div class="space-y-2">
+          <template x-for="r in boostCandidates" :key="r.content.id">
+            <div class="card-2 p-3 flex flex-wrap items-center gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-medium truncate" x-text="r.content.title"></div>
+                <div class="text-[11px] num mt-0.5" style="color:var(--muted)"
+                     x-text="`${fmtNum(r.clicks)} คลิก · EPC ${fmtBaht(r.epc)} · รายได้ ${fmtBaht(r.revenue)}`"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" @click="markBoosted(r.content)">ดันแล้ว ✓</button>
+            </div>
+          </template>
         </div>
       </div>
 

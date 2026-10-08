@@ -370,3 +370,27 @@ alter table public.contents add column if not exists parent_id uuid references p
 alter table public.contents add column if not exists format    text default '';
 
 create index if not exists contents_parent_idx on public.contents (parent_id);
+
+-- ============================================================
+-- กติกาการโพสต์อัตโนมัติรายช่อง
+-- กันสองอย่างที่ทำให้ระบบ auto-post โดน Facebook มองว่าผิดปกติ:
+--   1) ยิงรัวเกินไป   2) โพสต์สินค้าเดิมซ้ำเร็วเกินไป
+-- ============================================================
+alter table public.channels add column if not exists posts_per_day   integer default 4;
+alter table public.channels add column if not exists min_gap_minutes integer default 90;
+alter table public.channels add column if not exists no_repeat_days  integer default 21;
+alter table public.channels add column if not exists time_slots      text default '7,12,18,21';
+alter table public.channels add column if not exists auto_post       boolean default false;
+
+-- คอมเมนต์แรก: Facebook ลดการมองเห็นโพสต์ที่มีลิงก์ออกนอกแพลตฟอร์ม
+-- จึงโพสต์เนื้อหาเปล่า ๆ ก่อน แล้วปักลิงก์ในคอมเมนต์แรกแทน
+alter table public.contents add column if not exists auto_comment boolean default true;
+alter table public.contents add column if not exists comment_text text default '';
+
+alter table public.publish_results add column if not exists comment_id    text default '';
+alter table public.publish_results add column if not exists comment_error text default '';
+
+create index if not exists contents_due_idx on public.contents (status, scheduled_at);
+
+-- ทำเครื่องหมายว่าโพสต์นี้เอาเงินไปดันแล้ว จะได้ไม่ดันซ้ำ
+alter table public.contents add column if not exists boosted boolean default false;
