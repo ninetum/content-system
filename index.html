@@ -491,6 +491,18 @@
                     <span class="text-[11px]" style="color:var(--muted)"
                           x-text="'· ' + styleById(c.style_id).emoji + ' ' + styleById(c.style_id).name"></span>
                   </template>
+                  <template x-if="c.format">
+                    <span class="text-[11px] card-2 px-1.5 py-0.5 rounded"
+                          x-text="formatInfo(c.format).icon + ' ' + c.format"></span>
+                  </template>
+                  <template x-if="c.parent_id">
+                    <span class="text-[11px]" style="color:var(--muted)"
+                          x-text="'↳ แตกจาก ' + (contentById(c.parent_id)?.title || 'ต้นฉบับที่ถูกลบ')"></span>
+                  </template>
+                  <template x-if="childrenOf(c.id).length">
+                    <span class="text-[11px]" style="color:var(--accent)"
+                          x-text="'♻️ แตกไปแล้ว ' + childrenOf(c.id).length + ' ชิ้น'"></span>
+                  </template>
                 </div>
                 <h3 class="font-semibold mt-1.5 text-[15px]" x-text="c.title"></h3>
                 <p class="text-sm mt-1 line-clamp-2 whitespace-pre-line" style="color:var(--text-2)" x-text="c.body"></p>
@@ -512,6 +524,7 @@
               <div class="flex flex-col gap-1.5 shrink-0">
                 <button class="btn btn-ghost btn-sm" @click="editContent(c)">✏️ แก้ไข</button>
                 <button class="btn btn-ghost btn-sm" @click="duplicateContent(c)">📑 ทำสำเนา</button>
+                <button class="btn btn-ghost btn-sm" @click="openRepurpose(c)">♻️ ปั่นคอนเทนต์</button>
                 <button class="btn btn-ghost btn-sm" @click="newJob(c)">✂️ สั่งตัดคลิป</button>
                 <template x-if="canPublishApi && c.status !== 'published'">
                   <button class="btn btn-ghost btn-sm" @click="publishViaApi(c)" :disabled="publishing===c.id">
@@ -534,6 +547,86 @@
         </template>
       </div>
     </section>
+
+    <!-- ===== กล่องปั่นคอนเทนต์ ===== -->
+    <template x-if="repurpose">
+    <div class="fixed inset-0 z-50 grid place-items-center p-4" style="background:rgba(0,0,0,.7)">
+      <div class="card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 space-y-4">
+
+        <div>
+          <h3 class="font-semibold">♻️ ปั่นคอนเทนต์จากชิ้นเดียว</h3>
+          <p class="text-xs mt-1" style="color:var(--text-2)">
+            ต้นฉบับ: <span class="font-medium" x-text="repurposeSource?.title"></span>
+          </p>
+          <p class="text-[11px] mt-1.5" style="color:var(--muted)">
+            ต้นทุนการอัดเท่าเดิม แต่ได้ของลงหลายวัน — ความถี่ในการโพสต์คือปัจจัยอันดับต้น ๆ ของยอดวิว
+          </p>
+        </div>
+
+        <div>
+          <label class="label">เลือกสูตร</label>
+          <div class="space-y-2">
+            <template x-for="r in cfg.recipes" :key="r.id">
+              <button class="w-full text-left card-2 p-3 transition"
+                      :style="repurpose.recipeId===r.id ? 'border-color:var(--accent); background:var(--accent-soft)' : ''"
+                      @click="repurpose.recipeId=r.id; buildRepurposePlan()">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold" x-text="r.name"></span>
+                  <span class="text-[11px] num" style="color:var(--muted)" x-text="r.items.length + ' ชิ้น'"></span>
+                </div>
+                <div class="text-[11px] mt-0.5" style="color:var(--text-2)" x-text="r.desc"></div>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <label class="label">เริ่มปล่อยชิ้นแรกเมื่อไหร่</label>
+          <input type="datetime-local" class="field" x-model="repurpose.startInput" @change="buildRepurposePlan()">
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="label mb-0">รายการที่จะสร้าง</label>
+            <span class="text-[11px] num" style="color:var(--muted)"
+                  x-text="`เลือกไว้ ${repurposeCount} ชิ้น` + (repurposeJobCount ? ` · ใบสั่งตัดคลิป ${repurposeJobCount} ใบ` : '')"></span>
+          </div>
+
+          <div class="space-y-2">
+            <template x-for="it in repurpose.items" :key="it.idx">
+              <div class="card-2 p-2.5">
+                <label class="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" class="w-4 h-4 accent-blue-500 mt-0.5" x-model="it.use">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-semibold">
+                      <span x-text="formatInfo(it.format).icon"></span>
+                      <span x-text="it.format"></span>
+                      <span style="color:var(--muted)" class="font-normal" x-text="'· ' + it.angle"></span>
+                    </div>
+                    <div class="text-[10px] mt-0.5" style="color:var(--muted)" x-text="formatInfo(it.format).hint"></div>
+                  </div>
+                  <template x-if="it.makeJob">
+                    <span class="badge badge-scheduled shrink-0">✂️ เปิดใบสั่งตัด</span>
+                  </template>
+                </label>
+
+                <div class="flex items-center gap-1.5 mt-2 pl-6" x-show="it.use">
+                  <input class="field text-[11px] py-1" x-model="it.title">
+                  <input type="datetime-local" class="field text-[11px] py-1 w-auto" x-model="it.whenInput">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button class="btn btn-primary flex-1" @click="applyRepurpose()"
+                  x-text="`สร้าง ${repurposeCount} ชิ้น`"></button>
+          <button class="btn btn-ghost" @click="repurpose=null">ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+    </template>
 
     <!-- ==================== สร้าง / แก้ไขคอนเทนต์ ==================== -->
     <section x-show="view==='editor'" class="space-y-4">

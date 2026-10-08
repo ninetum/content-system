@@ -362,3 +362,11 @@ create policy products_public_bio on public.products
 drop policy if exists tracked_links_public_bio on public.tracked_links;
 create policy tracked_links_public_bio on public.tracked_links
   for select to anon using (public_bio = true);
+
+-- ============================================================
+-- Repurpose — คอนเทนต์ที่แตกมาจากต้นฉบับชิ้นเดียว
+-- ============================================================
+alter table public.contents add column if not exists parent_id uuid references public.contents(id) on delete set null;
+alter table public.contents add column if not exists format    text default '';
+
+create index if not exists contents_parent_idx on public.contents (parent_id);

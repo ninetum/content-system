@@ -24,6 +24,7 @@ function cmsApp() {
     login: { email: '', password: '', mode: 'password' },   // password | link
     publishing: '',                                          // id ของคอนเทนต์ที่กำลังยิง API
     productForm: null,
+    repurpose: null,          // { sourceId, recipeId, startInput, items[] }
     saleForm: null,
     linkTarget: '',                                          // ปลายทางของลิงก์ที่กำลังจะสร้าง
 
@@ -859,6 +860,176 @@ function cmsApp() {
       this.editor.body = hooks[Math.floor(Math.random() * hooks.length)] + '\n\n' + b.split('\n').slice(1).join('\n');
       this.toast('เปลี่ยนประโยคฮุกให้ใหม่แล้ว กดซ้ำเพื่อสุ่มอีกได้', 'ok');
     },
+
+    /* ---------- ปั่นคอนเทนต์ (Repurpose) ----------
+     * ต้นทุนการอัดเท่าเดิม แต่ได้ของลงหลายชิ้น
+     * ความถี่ในการโพสต์คือปัจจัยอันดับต้น ๆ ของยอดวิว — สูตรพวกนี้ช่วยให้ไม่มีวันว่าง
+     */
+    openRepurpose(content) {
+      this.repurpose = {
+        sourceId: content.id,
+        recipeId: CFG.recipes[0].id,
+        startInput: this.toLocalInput(content.scheduled_at || new Date(Date.now() + 86400000).toISOString()),
+        items: [],
+      };
+      this.buildRepurposePlan();
+    },
+
+    get repurposeSource() { return this.contentById(this.repurpose?.sourceId); },
+    get repurposeRecipe() { return CFG.recipes.find((r) => r.id === this.repurpose?.recipeId) || CFG.recipes[0]; },
+
+    formatInfo(id) { return CFG.formats.find((f) => f.id === id) || { id, icon: '•', job: false, hint: '' }; },
+
+    buildRepurposePlan() {
+      const src = this.repurposeSource;
+      if (!src) return;
+      const start = this.fromLocalInput(this.repurpose.startInput) || new Date().toISOString();
+
+      this.repurpose.items = this.repurposeRecipe.items.map((it, i) => {
+        const when = new Date(new Date(start).getTime() + it.dayOffset * 86400000);
+        return {
+          idx: i,
+          use: true,
+          format: it.format,
+          angle: it.angle,
+          title: `${src.title} — ${it.format} (${it.angle})`,
+          whenInput: this.toLocalInput(when.toISOString()),
+          makeJob: !!this.formatInfo(it.format).job,
+        };
+      });
+    },
+
+    // โครงเนื้อหาที่เหมาะกับแต่ละฟอร์แมต — เขียนต่อได้เลย ไม่ต้องเริ่มจากหน้าว่าง
+    scaffoldFor(format, angle, src) {
+      const cta = this.styleById(src.style_id)?.cta || 'ลิงก์อยู่ในคอมเมนต์แรกครับ';
+      const products = (src.product_ids || []).map((id) => this.productById(id)?.name).filter(Boolean);
+      const prodLine = products.length ? `สินค้าในคลิป: ${products.join(', ')}` : '';
+
+      if (format === 'คลิปสั้น') {
+        return [
+          `[0-3 วิ] ฮุก: ${angle}`,
+          '[3-15 วิ] เล่าปัญหาที่คนดูเจอจริง ๆ',
+          '[15-30 วิ] โชว์ของ / พิสูจน์ให้เห็นกับตา',
+          `[ปิดท้าย] ${cta}`,
+          '',
+          prodLine,
+          '— ดูคลิปต้นฉบับแล้วจดช่วงเวลาที่จะตัด ใส่ในใบสั่งงานตัดคลิป',
+        ].filter(Boolean).join('\n');
+      }
+
+      if (format === 'โพสต์ยาว') {
+        return [
+          `${angle}`,
+          '',
+          '(ย่อหน้าแรก — เล่าปัญหาที่เจอเอง ให้คนอ่านรู้สึกว่า "นี่มันเรื่องของเรา")',
+          '',
+          'สิ่งที่ชอบ',
+          '- ',
+          '- ',
+          '- ',
+          '',
+          'สิ่งที่ต้องรู้ก่อนตัดสินใจ',
+          '- ',
+          '',
+          cta,
+          '',
+          prodLine,
+        ].filter(Boolean).join('\n');
+      }
+
+      if (format === 'ภาพชุด') {
+        return [
+          `สไลด์ 1 — พาดหัว: ${angle}`,
+          'สไลด์ 2 — ปัญหาที่เจอ',
+          'สไลด์ 3 — วิธีแก้ / จุดเด่นที่สำคัญจริง',
+          'สไลด์ 4 — ราคากับความคุ้ม',
+          `สไลด์ 5 — ${cta}`,
+          '',
+          '— ตัวหนังสือใหญ่ อ่านจบทั้งชุดใน 10 วินาที',
+          prodLine,
+        ].filter(Boolean).join('\n');
+      }
+
+      if (format === 'คอมเมนต์แรก') {
+        return [
+          'ลิงก์อยู่ตรงนี้ครับ 👇',
+          '(วางลิงก์ติดตามผลที่สร้างจากคอนเทนต์แม่)',
+          '',
+          '* กดผ่านลิงก์นี้ผมได้ค่าคอมจากร้านค้า คุณจ่ายเท่าเดิมครับ',
+          '',
+          '— เหตุผลที่แยกลิงก์มาไว้คอมเมนต์: Facebook ลดการมองเห็นโพสต์ที่มีลิงก์ออกนอกแพลตฟอร์ม',
+          '  โพสต์หลักเลยไม่ควรมีลิงก์ แล้วมาปักในคอมเมนต์แรกแทน',
+        ].join('\n');
+      }
+
+      return [
+        `มุมใหม่: ${angle}`,
+        '',
+        '(เล่าเรื่องเดิมด้วยมุมอื่น เช่น คำถามที่คนถามมาเยอะ หรือผลหลังใช้ไปสองสัปดาห์)',
+        '',
+        cta,
+        '',
+        prodLine,
+      ].filter(Boolean).join('\n');
+    },
+
+    get repurposeCount() { return (this.repurpose?.items || []).filter((i) => i.use).length; },
+    get repurposeJobCount() { return (this.repurpose?.items || []).filter((i) => i.use && i.makeJob).length; },
+
+    async applyRepurpose() {
+      const src = this.repurposeSource;
+      const picked = (this.repurpose.items || []).filter((i) => i.use);
+      if (!src) { this.toast('ไม่พบคอนเทนต์ต้นทาง', 'err'); return; }
+      if (!picked.length) { this.toast('เลือกอย่างน้อย 1 ชิ้นก่อนครับ', 'warn'); return; }
+
+      let made = 0, jobs = 0;
+      await this.run(async () => {
+        for (const it of picked) {
+          const row = await Store.create('contents', {
+            title: it.title,
+            body: this.scaffoldFor(it.format, it.angle, src),
+            pillar: src.pillar || '',
+            style_id: src.style_id || null,
+            hashtags: [...(src.hashtags || [])],
+            channel_ids: [...(src.channel_ids || [])],
+            media_ids: [],
+            product_ids: [...(src.product_ids || [])],
+            status: 'draft',
+            scheduled_at: this.fromLocalInput(it.whenInput),
+            note: `แตกมาจาก: ${src.title}`,
+            author: this.userEmail || 'ผู้ใช้งาน',
+            parent_id: src.id,
+            format: it.format,
+            published_at: null,
+          });
+          made++;
+
+          // คลิปสั้นต้องตัดจริง — เปิดใบสั่งงานรอไว้ให้เลย
+          if (it.makeJob) {
+            await Store.create('editJobs', {
+              content_id: row.id,
+              title: it.title,
+              source: '', aspect: '9:16', target_sec: 30,
+              cut_silence: true, silence_ms: 400,
+              subtitle: true, sub_style: 'ขาวขอบดำ อ่านง่าย', bilingual: false,
+              bgm: true, bgm_mood: 'อัปบีต สนุก', sfx: true,
+              transition: 'คัตตรง + ซูมเล็กน้อยตอนเปลี่ยนประเด็น',
+              note: `มุม: ${it.angle} — ตัดจากคลิปต้นฉบับของ "${src.title}"`,
+              status: 'รอเริ่มงาน',
+            });
+            jobs++;
+          }
+        }
+        await this.log(src.id, 'ปั่นคอนเทนต์', `แตกออก ${made} ชิ้น`);
+        this.refresh();
+        this.repurpose = null;
+      }, `สร้างคอนเทนต์ใหม่ ${made} ชิ้น${jobs ? ` และเปิดใบสั่งตัดคลิป ${jobs} ใบ` : ''}`);
+
+      this.go('contents');
+    },
+
+    // คอนเทนต์ที่แตกออกมาจากชิ้นนี้
+    childrenOf(contentId) { return this.db.contents.filter((c) => c.parent_id === contentId); },
 
     /* ---------- เพจ & ช่อง ---------- */
     newChannel() {
